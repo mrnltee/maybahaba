@@ -1,0 +1,20 @@
+# Local Cloudflare Workers development variables.
+#
+# Copy to `.dev.vars` (gitignored) when running `npm run preview`, which
+# runs the real Worker runtime locally. `.env.local` is used by `next dev`;
+# `.dev.vars` is used by the Workers runtime. Keep them in sync.
+#
+# In PRODUCTION these are not files — upload them as Worker secrets:
+#   npx wrangler secret put NEXT_PUBLIC_SUPABASE_URL
+#   npx wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   npx wrangler secret put ADMIN_PASSCODE
+#   npx wrangler secret put ABUSE_HASH_SALT
+
+NEXTJS_ENV=development
+
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+ADMIN_PASSCODE=
+ABUSE_HASH_SALT=

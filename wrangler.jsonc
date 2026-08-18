@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "maybahaba",
+  // Required by the OpenNext adapter. Do not lower this date.
+  "compatibility_date": "2024-12-30",
+  "compatibility_flags": [
+    // Next.js needs Node built-ins (node:crypto is used for hashing and
+    // the admin passcode comparison). All node:crypto APIs this project
+    // uses are supported on Workers under this flag.
+    "nodejs_compat",
+    // Makes outbound fetch() behave like a real public request rather
+    // than being able to loop back into this Worker implicitly.
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "maybahaba"
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+
+  // Deliberately NOT configured:
+  //
+  // - "images": this app renders no <Image>; the binding would be dead weight.
+  // - R2 incremental cache: every meaningful route here is dynamic
+  //   (flood data must never be served stale), so there is no ISR output
+  //   worth caching. Add r2IncrementalCache in open-next.config.ts if
+  //   that changes.
+  //
+  // Secrets (Supabase keys, ADMIN_PASSCODE, ABUSE_HASH_SALT) are NOT set
+  // here — they are uploaded with `wrangler secret put`. See README.
+}
