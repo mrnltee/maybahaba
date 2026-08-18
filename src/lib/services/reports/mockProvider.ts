@@ -343,6 +343,14 @@ class MockReportProvider implements ReportService {
     return list.slice(0, filter.limit ?? 50);
   }
 
+  async getAllForAdmin(limit = 1000): Promise<FloodReport[]> {
+    await this.sweepExpired();
+    return this.reports
+      .slice()
+      .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime())
+      .slice(0, limit);
+  }
+
   async sweepExpired(): Promise<number> {
     const cutoff = Date.now() - REPORT_EXPIRY_MINUTES * 60_000;
     let count = 0;

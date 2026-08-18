@@ -62,6 +62,13 @@ export interface ReportService {
     validatorRef: string
   ): Promise<FloodReport | null>;
   getPending(filter: PendingReportsFilter): Promise<FloodReport[]>;
+  /**
+   * Every report regardless of status — moderator view only.
+   * Unlike the public queries this deliberately includes DENIED and
+   * EXPIRED rows, since the whole point of the admin table is to see
+   * what was filed and what happened to it.
+   */
+  getAllForAdmin(limit?: number): Promise<FloodReport[]>;
   /** Marks reports older than the expiry window as EXPIRED. Safe to call often; idempotent. */
   sweepExpired(): Promise<number>;
 }

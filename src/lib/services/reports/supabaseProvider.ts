@@ -195,6 +195,20 @@ export class SupabaseReportProvider implements ReportService {
     return (data as ReportRow[]).map(rowToReport);
   }
 
+  async getAllForAdmin(limit = 1000): Promise<FloodReport[]> {
+    // Uses the service-role client so RLS doesn't hide DENIED rows —
+    // this path is already gated behind a moderator session upstream.
+    const client = supabaseAdmin ?? supabasePublic;
+    if (!client) throw new ReportServiceError("Supabase is not configured");
+    const { data, error } = await client
+      .from("reports")
+      .select("*")
+      .order("reported_at", { ascending: false })
+      .limit(limit);
+    if (error) throw new ReportServiceError("Failed to fetch reports", error);
+    return (data as ReportRow[]).map(rowToReport);
+  }
+
   async sweepExpired(): Promise<number> {
     const client = supabaseAdmin ?? supabasePublic;
     if (!client) throw new ReportServiceError("Supabase is not configured");

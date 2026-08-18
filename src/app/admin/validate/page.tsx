@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminSignIn } from "@/components/AdminSignIn";
 import { MapViewLoader } from "@/components/MapViewLoader";
 import { getFloodDepthOption, type FloodReport, type ValidationAction } from "@/lib/types";
 import { formatPhTime, formatRelativeTime } from "@/lib/time";
@@ -9,9 +10,6 @@ type SortMode = "newest" | "nearest" | "flagged" | "high_priority";
 
 export default function ValidateReportsPage() {
   const [authed, setAuthed] = useState<boolean | null>(null); // null = unknown until first fetch attempt
-  const [passcode, setPasscode] = useState("");
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loggingIn, setLoggingIn] = useState(false);
 
   const [sort, setSort] = useState<SortMode>("newest");
   const [reports, setReports] = useState<FloodReport[]>([]);
@@ -47,30 +45,6 @@ export default function ValidateReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sort]);
 
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoggingIn(true);
-    setLoginError(null);
-    try {
-      const res = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passcode }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setLoginError(data.error ?? "Mali ang passcode.");
-        return;
-      }
-      setPasscode("");
-      loadReports();
-    } catch {
-      setLoginError("Mukhang offline ka. Check your connection and try again.");
-    } finally {
-      setLoggingIn(false);
-    }
-  }
-
   async function handleAction(reportId: string, action: ValidationAction) {
     setActingOnId(reportId);
     try {
@@ -88,39 +62,7 @@ export default function ValidateReportsPage() {
   }
 
   if (authed === false) {
-    return (
-      <main className="mx-auto flex max-w-sm flex-1 flex-col justify-center px-4 py-16">
-        <h1 className="text-xl font-bold text-(--color-ink)">Moderator sign-in</h1>
-        <p className="mt-1 text-sm text-(--color-ink-muted)">
-          Ang page na ito ay para sa mga moderator lamang.
-        </p>
-        <form onSubmit={handleLogin} className="mt-6 space-y-3">
-          <label htmlFor="passcode" className="text-sm font-medium text-(--color-ink)">
-            Passcode
-          </label>
-          <input
-            id="passcode"
-            type="password"
-            value={passcode}
-            onChange={(e) => setPasscode(e.target.value)}
-            className="w-full rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-2.5 text-sm"
-            autoFocus
-          />
-          {loginError && (
-            <p role="alert" className="text-sm text-(--color-danger)">
-              {loginError}
-            </p>
-          )}
-          <button
-            type="submit"
-            disabled={loggingIn}
-            className="w-full rounded-full bg-(--color-brand) px-4 py-2.5 text-sm font-semibold text-(--color-brand-ink) hover:bg-(--color-brand-hover) disabled:opacity-60"
-          >
-            {loggingIn ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-      </main>
-    );
+    return <AdminSignIn onSignedIn={loadReports} />;
   }
 
   return (

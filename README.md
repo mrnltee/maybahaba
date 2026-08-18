@@ -36,13 +36,16 @@ To connect a real database, see [Database setup](#database-setup) below.
 src/
   app/
     page.tsx                     Homepage (server) → HomeClient
-    admin/validate/page.tsx      Moderator queue (passcode-gated, not linked from public nav)
+    admin/validate/page.tsx      Moderator queue — judge one report at a time
+    admin/reports/page.tsx       Moderator ledger — every report, filters, CSV export
     privacy/page.tsx             Privacy notice
     api/
       search/route.ts            Geocoding search + reverse geocode
       reports/route.ts           POST — submit a report (validation + duplicate check)
       reports/nearby/route.ts    GET — current status for a location
       reports/pending/route.ts   GET — moderation queue (admin only)
+      admin/session/route.ts     GET — is the caller a signed-in moderator? (boolean only)
+      admin/reports/route.ts     GET — every report as JSON, or `?format=csv` to download
       reports/[id]/validate/     POST — validate/deny/flag (admin only)
       admin/login, admin/logout  Passcode session cookie
   components/                    UI components (search box, modal, map, cards)
@@ -206,7 +209,7 @@ See `.env.example` for the full list with inline explanations. Summary:
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | No — falls back to mock data | No (free tier) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Only for real moderation actions | No |
 | `ABUSE_HASH_SALT` | Recommended in production | No |
-| `ADMIN_PASSCODE` | Required to use `/admin/validate` | No |
+| `ADMIN_PASSCODE` | Required to use `/admin/validate` and `/admin/reports` | No |
 | `NEXT_PUBLIC_MAP_PROVIDER` | No (informational; only `osm` is implemented) | No |
 
 Never commit `.env.local`. It's already covered by `.gitignore`.
@@ -215,12 +218,37 @@ Never commit `.env.local`. It's already covered by `.gitignore`.
 
 ## Moderation
 
-`/admin/validate` is intentionally **not linked from the public UI**. It's
-gated by a shared passcode (`ADMIN_PASSCODE`) stored as an httpOnly session
-cookie — enough to keep the queue out of casual reach for an MVP with a
+There are two moderator surfaces:
+
+| Route | What it's for |
+| --- | --- |
+| `/admin/validate` | The queue. One report at a time, with a map, and validate/deny buttons. |
+| `/admin/reports` | The ledger. Every report ever filed — including denied and expired — with status filters, text search, and a CSV export. |
+
+Both are gated by a shared passcode (`ADMIN_PASSCODE`) stored as an httpOnly
+session cookie — enough to keep them out of casual reach for an MVP with a
 single moderator, but **not real authentication**. Before inviting multiple
 moderators, replace `lib/admin.ts` with Supabase Auth + a `moderators`
 table and per-user audit trails.
+
+Neither is linked from the public UI. The "Report Baha" button grows a small
+dropdown containing both links **only** once you already hold a valid
+session — the header asks `/api/admin/session`, which returns nothing but a
+boolean. A moderator who isn't signed in reaches either page by typing the
+URL, and gets a passcode form in place.
+
+### CSV export
+
+`/api/admin/reports?format=csv` downloads the full ledger. It's CSV rather
+than a real `.xlsx` so the Worker bundle stays small; Excel and Numbers both
+open it natively. Two details that matter:
+
+- A UTF-8 BOM is prepended so Excel renders `ñ` in Filipino place names
+  instead of mojibake.
+- Any field starting with `=`, `+`, `-` or `@` is prefixed with a single
+  quote. Reporter names are attacker-controlled and anonymous, and Excel
+  executes such values as formulas — see `csvCell()` in
+  `api/admin/reports/route.ts`.
 
 ---
 
@@ -348,6 +376,7 @@ Manually verify, per the brief's Phase 6 checklist:
   again
 - Map interaction (pan/zoom, tap a marker, drop/drag a pin)
 - `/admin/validate` sign-in and validate/deny actions
+- `/admin/reports` ledger, status filters, and CSV export (incl. formula-injection escaping)
 - A stale/expired demo report (see `mockProvider.ts`) does **not** appear as
   a current condition
 - Keyboard-only navigation through search, modal, and admin actions

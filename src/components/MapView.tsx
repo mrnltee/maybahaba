@@ -1,7 +1,7 @@
 "use client";
 
 import { ValidationControls } from "@/components/ValidationControls";
-import { DEPTH_MAP_COLOR, MAP_LEGEND } from "@/lib/mapColors";
+import { DEPTH_MAP_COLOR, DISPUTED_MAP_COLOR, MAP_LEGEND, isDisputed } from "@/lib/mapColors";
 import { formatRelativeTime } from "@/lib/time";
 import { getFloodDepthOption, type FloodReport } from "@/lib/types";
 import type L from "leaflet";
@@ -164,7 +164,10 @@ export function MapView({
       markersRef.current.push(centerMarker);
 
       for (const report of reports) {
-        const color = DEPTH_MAP_COLOR[report.floodDepth];
+        // Disputed reports drop out of the depth palette entirely — see
+        // isDisputed() for why they stay on the map at all.
+        const disputed = isDisputed(report);
+        const color = disputed ? DISPUTED_MAP_COLOR : DEPTH_MAP_COLOR[report.floodDepth];
         const isFocused = report.id === focusedReportId;
         const size = isFocused ? 22 : 16;
         const icon = L.divIcon({
@@ -177,7 +180,7 @@ export function MapView({
         const depth = getFloodDepthOption(report.floodDepth);
         const marker = L.marker([report.latitude, report.longitude], {
           icon,
-          alt: `${depth.label} sa ${report.locationName}`,
+          alt: `${depth.label} sa ${report.locationName}${disputed ? " (di-beripikado)" : ""}`,
         }).addTo(mapRef.current!);
 
         const popupEl = document.createElement("div");
@@ -190,7 +193,12 @@ export function MapView({
           <p style="margin:0 0 4px;color:#4b5359;font-size:13px">${escapeHtml(report.locationName)}</p>
           <p style="margin:0;color:#767f85;font-size:12px">${escapeHtml(formatRelativeTime(report.reportedAt))}${
             report.isDemoData ? " · DEMO DATA" : ""
-          }</p>`;
+          }</p>
+          ${
+            disputed
+              ? '<p style="margin:6px 0 0;color:#8b9096;font-size:12px;font-weight:600">Di-beripikado — may nagsabing mali ang report na ito.</p>'
+              : ""
+          }`;
         popupEl.appendChild(header);
 
         if (allowValidation) {

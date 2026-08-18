@@ -127,14 +127,18 @@ export type VehicleTypeCode =
   | "JEEPNEY"
   | "OTHER";
 
-export const VEHICLE_TYPE_OPTIONS: { code: VehicleTypeCode; label: string }[] = [
-  { code: "MOTORCYCLE", label: "Motorcycle" },
-  { code: "SEDAN", label: "Sedan" },
-  { code: "SUV", label: "SUV" },
-  { code: "TRUCK", label: "Truck" },
-  { code: "JEEPNEY", label: "Jeepney" },
-  { code: "OTHER", label: "Other" },
-];
+export const VEHICLE_TYPE_LABELS: Record<VehicleTypeCode, string> = {
+  MOTORCYCLE: "Motorcycle",
+  SEDAN: "Sedan",
+  SUV: "SUV",
+  TRUCK: "Truck",
+  JEEPNEY: "Jeepney",
+  OTHER: "Other",
+};
+
+export const VEHICLE_TYPE_OPTIONS: { code: VehicleTypeCode; label: string }[] = (
+  ["MOTORCYCLE", "SEDAN", "SUV", "TRUCK", "JEEPNEY", "OTHER"] as VehicleTypeCode[]
+).map((code) => ({ code, label: VEHICLE_TYPE_LABELS[code] }));
 
 /** Lifecycle status of a report (spec section 15 / 22). */
 export type ReportStatus =
