@@ -77,9 +77,12 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
   const disabled = state === "sending";
   const settled = state === "done" || state === "already" || alreadyVotedLocally;
 
+  // WCAG 2.2 AA (2.5.8) only requires 24x24, which the old sizes met.
+  // These are bigger anyway: the target user is tapping one-handed,
+  // outdoors, possibly in the rain (spec section 25).
   const buttonBase = compact
-    ? "rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-    : "rounded-full border px-3 py-1.5 text-xs font-semibold";
+    ? "inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+    : "inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-xs font-semibold";
 
   if (settled) {
     return (
@@ -107,7 +110,7 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
             type="button"
             disabled={disabled}
             onClick={() => vote("STILL_FLOODED")}
-            className={`${buttonBase} border-(--color-border) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
+            className={`${buttonBase} border-(--color-border-strong) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
           >
             Oo, may baha pa
           </button>
@@ -115,7 +118,7 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
             type="button"
             disabled={disabled}
             onClick={() => vote("NO_LONGER_FLOODED")}
-            className={`${buttonBase} border-(--color-border) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
+            className={`${buttonBase} border-(--color-border-strong) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
           >
             Wala na
           </button>
@@ -135,7 +138,7 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
             disabled={disabled}
             onClick={() => vote("ACCURATE")}
             aria-label="Tama ang report na ito"
-            className={`${buttonBase} inline-flex items-center gap-1 border-(--color-border) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
+            className={`${buttonBase} gap-1 border-(--color-border-strong) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
           >
             <Check className="h-3 w-3" aria-hidden="true" />
             Tama
@@ -145,7 +148,7 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
             disabled={disabled}
             onClick={() => vote("INACCURATE")}
             aria-label="Mali ang report na ito"
-            className={`${buttonBase} inline-flex items-center gap-1 border-(--color-border) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
+            className={`${buttonBase} gap-1 border-(--color-border-strong) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
           >
             <X className="h-3 w-3" aria-hidden="true" />
             Mali

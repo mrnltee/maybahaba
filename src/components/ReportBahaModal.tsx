@@ -272,7 +272,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
                 type="button"
                 onClick={handleUseMyLocation}
                 disabled={locating}
-                className="inline-flex items-center gap-1.5 rounded-full border border-(--color-border) px-3 py-1.5 text-xs font-medium text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-full border border-(--color-border-strong) px-3 py-1.5 text-xs font-medium text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-60"
               >
                 <LocateFixed className="h-3.5 w-3.5" aria-hidden="true" />
                 {locating ? "Kinukuha ang lokasyon…" : "Use My Location"}
@@ -280,7 +280,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
               <button
                 type="button"
                 onClick={openBlankMap}
-                className="inline-flex items-center gap-1.5 rounded-full border border-(--color-border) px-3 py-1.5 text-xs font-medium text-(--color-ink) hover:bg-(--color-paper)"
+                className="inline-flex items-center gap-1.5 rounded-full border border-(--color-border-strong) px-3 py-1.5 text-xs font-medium text-(--color-ink) hover:bg-(--color-paper)"
               >
                 <MapIcon className="h-3.5 w-3.5" aria-hidden="true" />
                 Pin on Map
@@ -312,7 +312,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
               value={reportedAtLocal}
               onChange={(e) => setReportedAtLocal(e.target.value)}
               max={utcIsoToPhLocalInput(new Date().toISOString())}
-              className="mt-2 w-full rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3 text-sm text-(--color-ink) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
+              className="mt-2 w-full rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-4 py-3 text-sm text-(--color-ink) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
             />
           </div>
 
@@ -338,7 +338,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
                     id="road-condition"
                     value={roadCondition}
                     onChange={(e) => setRoadCondition(e.target.value as RoadConditionCode | "")}
-                    className="mt-1.5 w-full rounded-xl border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm text-(--color-ink)"
+                    className="mt-1.5 w-full rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-3 py-2.5 text-sm text-(--color-ink)"
                   >
                     <option value="">Not specified</option>
                     {ROAD_CONDITION_OPTIONS.map((o) => (
@@ -357,7 +357,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
                     id="vehicle-type"
                     value={vehicleType}
                     onChange={(e) => setVehicleType(e.target.value as VehicleTypeCode | "")}
-                    className="mt-1.5 w-full rounded-xl border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm text-(--color-ink)"
+                    className="mt-1.5 w-full rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-3 py-2.5 text-sm text-(--color-ink)"
                   >
                     <option value="">Not specified</option>
                     {VEHICLE_TYPE_OPTIONS.map((o) => (
@@ -384,7 +384,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
                 onChange={(e) => setReporterName(e.target.value)}
                 placeholder="Optional name / nickname"
                 maxLength={60}
-                className="flex-1 rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-2.5 text-sm text-(--color-ink) disabled:opacity-50"
+                className="flex-1 rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-4 py-2.5 text-sm text-(--color-ink) disabled:opacity-50"
               />
             </div>
             <label className="mt-2 flex items-center gap-2 text-sm text-(--color-ink-muted)">

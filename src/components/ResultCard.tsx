@@ -12,6 +12,22 @@ import { STATUS_COPY } from "@/lib/status";
 import type { FloodReport, NearbySearchResult } from "@/lib/types";
 import { MapPinned } from "lucide-react";
 
+/**
+ * The single screen this product lives or dies on.
+ *
+ * Structured in four tiers, because the brief's success criterion is that
+ * a motorist can answer "may baha ba?" in seconds (spec section 27/55):
+ *
+ *   1. ANSWER    status + depth + how long ago — readable at a glance
+ *   2. CONTEXT   where, and how much to trust it
+ *   3. ACT       view on map, hand off to a navigation app
+ *   4. CONTRIBUTE  confirm the report for the next person
+ *
+ * Everything the previous version showed is still here; it is re-ranked,
+ * not removed. Explanatory prose and the absolute timestamp moved below
+ * the fold of attention (or into a tooltip) so they stop competing with
+ * the answer itself.
+ */
 export function ResultCard({
   result,
   locationLabel,
@@ -34,96 +50,102 @@ export function ResultCard({
     ? conciseLocationLabel(topReport, topReport.locationName)
     : conciseLocationLabel({}, locationLabel);
 
+  // The headline is the depth when there is flooding ("Tuhod" tells a
+  // driver more than "May Baha" does). Otherwise the status carries it.
+  const showDepthAsHeadline = Boolean(depth && depth.code !== "WALANG_BAHA");
+
   return (
     <section
       aria-live="polite"
       className="w-full rounded-2xl border border-(--color-border) bg-(--color-surface) p-6 sm:p-8"
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-widest text-(--color-ink-faint)">
-          May Baha
+      {/* ---- Tier 2 (top): where, so the answer below has a subject ---- */}
+      <div className="flex items-start justify-between gap-3">
+        <p className="flex items-start gap-1.5 text-sm text-(--color-ink-muted)">
+          <MapPinned className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span title={wasShortened(displayLabel, locationLabel) ? locationLabel : undefined}>
+            {displayLabel}
+          </span>
         </p>
         {topReport?.isDemoData && <DemoDataBadge />}
       </div>
 
-      <div className="mt-3">
+      {/* ---- Tier 1: the answer ---- */}
+      <div className="mt-4">
         <StatusBadge status={status} />
       </div>
 
-      {depth && depth.code !== "WALANG_BAHA" && (
-        <p className="mt-4 text-3xl font-bold tracking-tight text-(--color-ink) sm:text-4xl">
-          {depth.label}
-        </p>
-      )}
-      {depth && (
-        <p className="mt-1 text-sm text-(--color-ink-muted)">{depth.description}</p>
-      )}
-
-      <p className="mt-4 text-sm text-(--color-ink-muted)">{copy.sub}</p>
+      <h2
+        className={
+          showDepthAsHeadline
+            ? "mt-3 text-4xl font-bold tracking-tight text-(--color-ink) sm:text-5xl"
+            : "mt-3 text-2xl font-bold tracking-tight text-(--color-ink)"
+        }
+      >
+        {showDepthAsHeadline ? depth!.label : copy.headline}
+      </h2>
 
       {topReport && (
-        <>
-          <p className="mt-4 text-sm font-medium text-(--color-ink)">
-            Reported {formatRelativeTime(topReport.reportedAt)}
-            <span className="ml-2 font-normal text-(--color-ink-faint)">
-              ({formatPhTime(topReport.reportedAt)})
-            </span>
-          </p>
+        <p className="mt-2 text-base font-medium text-(--color-ink)">
+          Reported {formatRelativeTime(topReport.reportedAt)}
+          {/* Absolute time as real text for assistive tech — a title
+              attribute is not reliably announced and is unreachable by
+              keyboard. Visually hidden to keep the glance-read clean. */}
+          <span className="sr-only"> ({formatPhTime(topReport.reportedAt)})</span>
           {topReport.lastConfirmedAt && (
-            <p className="mt-0.5 text-sm text-(--color-ink-muted)">
-              Huling kumpirmado {formatRelativeTime(topReport.lastConfirmedAt)}
-            </p>
+            <span className="font-normal text-(--color-ink-muted)">
+              {" · kumpirmado "}
+              {formatRelativeTime(topReport.lastConfirmedAt)}
+            </span>
           )}
-        </>
+        </p>
       )}
 
-      <div className="mt-2 flex items-start gap-2 text-sm text-(--color-ink-muted)">
-        <MapPinned className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        {/* Short label for glanceability; full geocoder string kept as a
-            tooltip so the exact match is still verifiable. */}
-        <span title={wasShortened(displayLabel, locationLabel) ? locationLabel : undefined}>
-          {displayLabel}
-        </span>
+      {/* ---- Tier 2: trust signals, on one line instead of three ---- */}
+      {(confidence.level !== "NONE" || otherReportsCount > 0) && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+          <ConfidenceBadge confidence={confidence} />
+          {otherReportsCount > 0 && (
+            <span className="text-(--color-ink-faint)">
+              · {otherReportsCount} pang report sa loob ng 300m
+            </span>
+          )}
+        </div>
+      )}
+
+      {topReport && <CommunitySignals report={topReport} />}
+
+      {/* ---- Tier 3: the explanation, deliberately quieter ---- */}
+      <div className="mt-4 space-y-1 border-l-2 border-(--color-border) pl-3">
+        {depth && <p className="text-sm text-(--color-ink-muted)">{depth.description}</p>}
+        <p className="text-sm text-(--color-ink-muted)">{copy.sub}</p>
       </div>
 
-      {confidence.level !== "NONE" && (
-        <div className="mt-3">
-          <ConfidenceBadge confidence={confidence} />
-        </div>
-      )}
-
-      {otherReportsCount > 0 && (
-        <p className="mt-1 text-sm text-(--color-ink-faint)">
-          {otherReportsCount} pang report sa loob ng 300m
-        </p>
-      )}
-
-      {topReport && (
-        <div className="mt-1">
-          <CommunitySignals report={topReport} />
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onViewOnMap}
-        className="mt-6 inline-flex items-center rounded-full border border-(--color-border) bg-(--color-paper) px-5 py-2.5 text-sm font-semibold text-(--color-ink) transition-colors hover:bg-(--color-surface) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
-      >
-        View on Map
-      </button>
-
-      {topReport && (
-        <div className="mt-4">
+      {/* ---- Tier 3: act on it ---- */}
+      <div className="mt-6 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onViewOnMap}
+          className="inline-flex items-center rounded-full border border-(--color-border-strong) bg-(--color-paper) px-5 py-2.5 text-sm font-semibold text-(--color-ink) transition-colors hover:bg-(--color-surface) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
+        >
+          View on Map
+        </button>
+        {topReport && (
           <ExternalMapLinks
             latitude={topReport.latitude}
             longitude={topReport.longitude}
             label={topReport.locationName}
+            inline
           />
-        </div>
-      )}
+        )}
+      </div>
 
+      {/* ---- Tier 4: contribute, clearly separated from reading ---- */}
       {topReport && (
         <div className="mt-6 border-t border-(--color-border) pt-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--color-ink-faint)">
+            Tulong para sa susunod na motorista
+          </p>
           <ValidationControls report={topReport} onVoted={onReportUpdated} />
         </div>
       )}

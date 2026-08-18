@@ -117,7 +117,7 @@ export function SearchBox({ placeholder = "Enter a location...", onSelect, autoF
           }}
           onFocus={() => !queryTooShort && results.length > 0 && setOpen(true)}
           onKeyDown={handleKeyDown}
-          className="w-full rounded-2xl border border-(--color-border) bg-(--color-surface) py-4 pl-12 pr-12 text-base text-(--color-ink) placeholder:text-(--color-ink-faint) shadow-sm focus:border-(--color-brand) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
+          className="w-full rounded-2xl border border-(--color-border-strong) bg-(--color-surface) py-4 pl-12 pr-12 text-base text-(--color-ink) placeholder:text-(--color-ink-faint) shadow-sm focus:border-(--color-brand) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
         />
         {loading && !queryTooShort && (
           <Loader2
@@ -158,7 +158,7 @@ export function SearchBox({ placeholder = "Enter a location...", onSelect, autoF
       )}
 
       {open && !queryTooShort && !loading && !error && results.length === 0 && (
-        <div className="absolute z-40 mt-2 w-full rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3 text-sm text-(--color-ink-muted) shadow-lg">
+        <div className="absolute z-40 mt-2 w-full rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-4 py-3 text-sm text-(--color-ink-muted) shadow-lg">
           Hindi namin makita ang lugar.
         </div>
       )}

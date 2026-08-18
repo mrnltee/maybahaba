@@ -12,8 +12,13 @@
   --color-paper: #fbfaf7;
   --color-ink: #14181b;
   --color-ink-muted: #4b5359;
-  --color-ink-faint: #767f85;
+  /* Darkened from #767f85: that failed WCAG 1.4.3 at 3.91:1 on paper. */
+  --color-ink-faint: #6c7479;
+  /* Decorative dividers only — exempt from 1.4.11 non-text contrast. */
   --color-border: #dcd7cd;
+  /* Boundaries of interactive controls (inputs, buttons, pills) must hit
+     3:1 per WCAG 1.4.11. The soft border above measures 1.4:1. */
+  --color-border-strong: #94918a;
   --color-surface: #ffffff;
 
   /* Brand: overcast-sky blue. Community-run public utility, not corporate. */
@@ -24,7 +29,8 @@
   /* Status colors — always paired with text/icon, never used alone. */
   --color-safe: #1a7a4c;
   --color-safe-bg: #eaf6ef;
-  --color-warn: #a5610a;
+  /* Nudged from #a5610a: 4.37:1 on warn-bg, just under the 4.5 floor. */
+  --color-warn: #a05e0a;
   --color-warn-bg: #fdf1e2;
   --color-danger: #b3261e;
   --color-danger-bg: #fbeae9;
@@ -41,6 +47,7 @@
   --color-ink-muted: var(--color-ink-muted);
   --color-ink-faint: var(--color-ink-faint);
   --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
   --color-surface: var(--color-surface);
   --color-brand: var(--color-brand);
   --color-brand-ink: var(--color-brand-ink);
