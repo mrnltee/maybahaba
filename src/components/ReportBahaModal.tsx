@@ -6,9 +6,8 @@ import { Modal } from "@/components/Modal";
 import { SearchBox } from "@/components/SearchBox";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { METRO_MANILA_CENTER } from "@/lib/geo";
-import { phLocalInputToUtcIso, utcIsoToPhLocalInput } from "@/lib/time";
+import { formatPhTimeShort, phLocalInputToUtcIso, utcIsoToPhLocalInput } from "@/lib/time";
 import {
-  ROAD_CONDITION_OPTIONS,
   VEHICLE_TYPE_OPTIONS,
   type DuplicateCheckResult,
   type FloodDepthCode,
@@ -19,7 +18,7 @@ import {
 } from "@/lib/types";
 import { getFloodDepthOption } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/time";
-import { CheckCircle2, LocateFixed, Map as MapIcon, TriangleAlert } from "lucide-react";
+import { Check, CheckCircle2, LocateFixed, Map as MapIcon, MapPinned, TriangleAlert } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 
 interface ReportBahaModalProps {
@@ -74,7 +73,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
   const [reportedAtLocal, setReportedAtLocal] = useState(() => utcIsoToPhLocalInput(new Date().toISOString()));
   const [floodDepth, setFloodDepth] = useState<FloodDepthCode | null>(null);
   const [roadCondition, setRoadCondition] = useState<RoadConditionCode | "">("");
-  const [vehicleType, setVehicleType] = useState<VehicleTypeCode | "">("");
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeCode[]>([]);
   const [reporterName, setReporterName] = useState("");
   const [anonymous, setAnonymous] = useState(true);
   const [showOptional, setShowOptional] = useState(false);
@@ -88,7 +87,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
     setReportedAtLocal(utcIsoToPhLocalInput(new Date().toISOString()));
     setFloodDepth(null);
     setRoadCondition("");
-    setVehicleType("");
+    setVehicleTypes([]);
     setReporterName("");
     setAnonymous(true);
     setShowOptional(false);
@@ -185,6 +184,12 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
     setShowMap(true);
   }
 
+  function toggleVehicleType(code: VehicleTypeCode) {
+    setVehicleTypes((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
+  }
+
   async function submitReport(acknowledgedDuplicateId: string | null) {
     if (!location || !floodDepth) return;
 
@@ -203,7 +208,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
           province: location.province,
           floodDepth,
           roadCondition: roadCondition || null,
-          vehicleType: vehicleType || null,
+          vehicleTypes,
           reportedAt: phLocalInputToUtcIso(reportedAtLocal),
           reporterName: anonymous ? null : reporterName.trim() || null,
           anonymous,
@@ -288,6 +293,32 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
             </div>
             {locationError && <p className="mt-2 text-sm text-(--color-danger)">{locationError}</p>}
 
+            {/*
+              The resolved address, shown explicitly.
+
+              Previously this only lived inside SearchBox's `initialValue`,
+              which is initial state — so pinning the map or using current
+              location reverse-geocoded correctly but the name never
+              appeared. You were filing reports without being able to see
+              where they'd land.
+            */}
+            {location && (
+              <div
+                aria-live="polite"
+                className="mt-3 flex items-start gap-2 rounded-xl border border-(--color-border) bg-(--color-paper) px-3 py-2.5"
+              >
+                <MapPinned className="mt-0.5 h-4 w-4 shrink-0 text-(--color-ink-faint)" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-(--color-ink)">
+                    {location.label || "Naka-pin na lokasyon"}
+                  </p>
+                  <p className="text-xs text-(--color-ink-faint)">
+                    {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {showMap && location && (
               <div className="mt-3">
                 <LocationPickerMapLoader
@@ -304,7 +335,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
 
           <div>
             <label className="text-sm font-semibold text-(--color-ink)" htmlFor="report-time">
-              Kailan naganap?
+              Anong oras mo nakita?
             </label>
             <input
               id="report-time"
@@ -314,6 +345,20 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
               max={utcIsoToPhLocalInput(new Date().toISOString())}
               className="mt-2 w-full rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-4 py-3 text-sm text-(--color-ink) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
             />
+            {/*
+              Time is what matters to a motorist — "as of 5:42 PM" is the
+              whole point. The date stays in the input because a report
+              filed just after midnight would otherwise be ambiguous, but
+              the feedback line below is phrased in the terms a reader
+              cares about, so a mis-set date is obvious before submitting.
+            */}
+            <p aria-live="polite" className="mt-1.5 text-xs text-(--color-ink-muted)">
+              Ire-report bilang:{" "}
+              <span className="font-medium text-(--color-ink)">
+                {formatRelativeTime(phLocalInputToUtcIso(reportedAtLocal))}
+              </span>{" "}
+              ({formatPhTimeShort(phLocalInputToUtcIso(reportedAtLocal))})
+            </p>
           </div>
 
           <FloodDepthPicker value={floodDepth} onChange={setFloodDepth} />
@@ -329,44 +374,63 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
             </button>
 
             {showOptional && (
-              <div className="mt-3 space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-(--color-ink)" htmlFor="road-condition">
-                    Road condition
-                  </label>
-                  <select
-                    id="road-condition"
-                    value={roadCondition}
-                    onChange={(e) => setRoadCondition(e.target.value as RoadConditionCode | "")}
-                    className="mt-1.5 w-full rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-3 py-2.5 text-sm text-(--color-ink)"
-                  >
-                    <option value="">Not specified</option>
-                    {ROAD_CONDITION_OPTIONS.map((o) => (
-                      <option key={o.code} value={o.code}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="mt-3 space-y-5">
+                {/*
+                  A single tick rather than a four-option scale. Reporters
+                  could not reliably separate "with caution" from
+                  "difficult", and a binary they answer honestly is worth
+                  more than a gradient they guess at. Older reports keep
+                  their finer-grained values (see ROAD_CONDITION_LABELS).
+                */}
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-3 py-2.5 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-(--color-brand)">
+                  <input
+                    type="checkbox"
+                    checked={roadCondition === "NOT_PASSABLE"}
+                    onChange={(e) => setRoadCondition(e.target.checked ? "NOT_PASSABLE" : "PASSABLE")}
+                    className="h-5 w-5 shrink-0 accent-(--color-brand)"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-(--color-ink)">
+                      Hindi madaanan ang kalsada
+                    </span>
+                    <span className="block text-xs text-(--color-ink-muted)">
+                      Iwanang blangko kung nadaanan mo naman.
+                    </span>
+                  </span>
+                </label>
 
-                <div>
-                  <label className="text-sm font-medium text-(--color-ink)" htmlFor="vehicle-type">
-                    Vehicle type
-                  </label>
-                  <select
-                    id="vehicle-type"
-                    value={vehicleType}
-                    onChange={(e) => setVehicleType(e.target.value as VehicleTypeCode | "")}
-                    className="mt-1.5 w-full rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-3 py-2.5 text-sm text-(--color-ink)"
-                  >
-                    <option value="">Not specified</option>
-                    {VEHICLE_TYPE_OPTIONS.map((o) => (
-                      <option key={o.code} value={o.code}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <fieldset>
+                  <legend className="text-sm font-medium text-(--color-ink)">
+                    Anong sasakyan ang apektado?
+                  </legend>
+                  <p className="mt-0.5 text-xs text-(--color-ink-muted)">
+                    Puwedeng higit sa isa.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {VEHICLE_TYPE_OPTIONS.map((o) => {
+                      const checked = vehicleTypes.includes(o.code);
+                      return (
+                        <label
+                          key={o.code}
+                          className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-(--color-brand) ${
+                            checked
+                              ? "border-(--color-brand) bg-(--color-brand)/5 font-semibold text-(--color-ink)"
+                              : "border-(--color-border-strong) bg-(--color-surface) text-(--color-ink)"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleVehicleType(o.code)}
+                            className="sr-only"
+                          />
+                          {checked && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+                          {o.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
               </div>
             )}
           </div>

@@ -16,6 +16,21 @@ export function Modal({ open, onClose, titleId, title, children }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
+  /**
+   * Callers pass `onClose` as an inline arrow, so its identity changes on
+   * every parent render. Holding it in a ref keeps it out of the effect's
+   * dependency list.
+   *
+   * This was a real bug, not a micro-optimisation: with `onClose` in the
+   * deps, typing one character in the reporter-name field re-rendered the
+   * parent, re-ran this effect, and called `dialogRef.focus()` — stealing
+   * focus from the input after every single keystroke.
+   */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     previouslyFocused.current = document.activeElement as HTMLElement;
@@ -23,7 +38,7 @@ export function Modal({ open, onClose, titleId, title, children }: ModalProps) {
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key === "Tab") {
@@ -50,7 +65,7 @@ export function Modal({ open, onClose, titleId, title, children }: ModalProps) {
       document.body.style.overflow = "";
       previouslyFocused.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

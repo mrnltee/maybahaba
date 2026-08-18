@@ -101,12 +101,23 @@ export type RoadConditionCode =
   | "DIFFICULT"
   | "NOT_PASSABLE";
 
-export const ROAD_CONDITION_OPTIONS: { code: RoadConditionCode; label: string }[] = [
-  { code: "PASSABLE", label: "Passable" },
-  { code: "PASSABLE_WITH_CAUTION", label: "Passable with caution" },
-  { code: "DIFFICULT", label: "Difficult to pass" },
-  { code: "NOT_PASSABLE", label: "Not passable" },
-];
+/**
+ * All four values remain valid so reports already in the database keep
+ * rendering. The form, however, now offers a single yes/no tick — in
+ * practice reporters could not reliably tell "with caution" from
+ * "difficult", and a binary they answer honestly beats a scale they
+ * guess at. `ROAD_CONDITION_LABELS` covers display of legacy values.
+ */
+export const ROAD_CONDITION_LABELS: Record<RoadConditionCode, string> = {
+  PASSABLE: "Madaanan",
+  PASSABLE_WITH_CAUTION: "Madaanan nang may ingat",
+  DIFFICULT: "Mahirap daanan",
+  NOT_PASSABLE: "Hindi madaanan",
+};
+
+export const ROAD_CONDITION_OPTIONS: { code: RoadConditionCode; label: string }[] = (
+  ["PASSABLE", "PASSABLE_WITH_CAUTION", "DIFFICULT", "NOT_PASSABLE"] as RoadConditionCode[]
+).map((code) => ({ code, label: ROAD_CONDITION_LABELS[code] }));
 
 export type VehicleTypeCode =
   | "MOTORCYCLE"
@@ -145,7 +156,12 @@ export interface FloodReport {
   province: string | null;
   floodDepth: FloodDepthCode;
   roadCondition: RoadConditionCode | null;
-  vehicleType: VehicleTypeCode | null;
+  /**
+   * Vehicle types the reporter saw affected. Multi-select: a flooded
+   * street rarely affects exactly one class of vehicle, and "passable for
+   * an SUV, not for a sedan" is the distinction motorists actually need.
+   */
+  vehicleTypes: VehicleTypeCode[];
   /** When the flooding was actually observed (UTC ISO string). */
   reportedAt: string;
   reporterName: string | null;

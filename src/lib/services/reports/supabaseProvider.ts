@@ -1,6 +1,6 @@
 import { REPORT_EXPIRY_MINUTES } from "@/lib/config/freshness";
 import { supabaseAdmin, supabasePublic } from "@/lib/supabaseClient";
-import type { CommunityAction, FloodReport, ValidationAction } from "@/lib/types";
+import type { CommunityAction, FloodReport, ValidationAction, VehicleTypeCode } from "@/lib/types";
 import type { CreateReportInput, PendingReportsFilter, ReportService } from "./types";
 import { ReportServiceError } from "./types";
 
@@ -24,7 +24,8 @@ interface ReportRow {
   province: string | null;
   flood_depth: FloodReport["floodDepth"];
   road_condition: FloodReport["roadCondition"];
-  vehicle_type: FloodReport["vehicleType"];
+  vehicle_type: VehicleTypeCode | null;
+  vehicle_types: VehicleTypeCode[] | null;
   reported_at: string;
   reporter_name: string | null;
   anonymous: boolean;
@@ -53,7 +54,9 @@ function rowToReport(row: ReportRow): FloodReport {
     province: row.province,
     floodDepth: row.flood_depth,
     roadCondition: row.road_condition,
-    vehicleType: row.vehicle_type,
+    // Prefer the array column; fall back to the legacy single value so
+    // pre-migration rows still render (see migration 0005).
+    vehicleTypes: row.vehicle_types ?? (row.vehicle_type ? [row.vehicle_type] : []),
     reportedAt: row.reported_at,
     reporterName: row.reporter_name,
     anonymous: row.anonymous,
@@ -105,7 +108,7 @@ export class SupabaseReportProvider implements ReportService {
         province: input.province,
         flood_depth: input.floodDepth,
         road_condition: input.roadCondition,
-        vehicle_type: input.vehicleType,
+        vehicle_types: input.vehicleTypes,
         reported_at: input.reportedAt,
         reporter_name: input.reporterName,
         anonymous: input.anonymous,

@@ -35,7 +35,8 @@ export const createReportSchema = z.object({
   province: z.string().trim().max(120).nullable().optional(),
   floodDepth: floodDepthEnum,
   roadCondition: roadConditionEnum.nullable().optional(),
-  vehicleType: vehicleTypeEnum.nullable().optional(),
+  // Multi-select; capped so a request cannot carry an unbounded array.
+  vehicleTypes: z.array(vehicleTypeEnum).max(6).optional(),
   reportedAt: z.string().datetime({ offset: true }),
   reporterName: z.string().trim().max(60).nullable().optional(),
   anonymous: z.boolean(),

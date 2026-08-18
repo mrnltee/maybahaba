@@ -50,9 +50,24 @@ export function ResultCard({
     ? conciseLocationLabel(topReport, topReport.locationName)
     : conciseLocationLabel({}, locationLabel);
 
-  // The headline is the depth when there is flooding ("Tuhod" tells a
-  // driver more than "May Baha" does). Otherwise the status carries it.
-  const showDepthAsHeadline = Boolean(depth && depth.code !== "WALANG_BAHA");
+  const isStale = status === "UNKNOWN_STALE";
+
+  /**
+   * The depth gets hero treatment only when it describes conditions we
+   * believe are CURRENT. "Baywang" set in 48px is a strong claim; making
+   * it that loud on a six-hour-old report would lend stale data the same
+   * authority as fresh data, which is exactly the confusion spec section
+   * 35 warns against. Stale reports still show the depth — just quietly,
+   * with the badge carrying the "this is old" signal.
+   */
+  const heroDepth = Boolean(depth && depth.code !== "WALANG_BAHA" && !isStale);
+
+  /**
+   * With no report, the status badge already says "No Recent Report" —
+   * repeating it as a headline was pure duplication. The heading stays in
+   * the DOM for document structure, just visually hidden.
+   */
+  const headingIsVisual = Boolean(topReport);
 
   return (
     <section
@@ -77,12 +92,16 @@ export function ResultCard({
 
       <h2
         className={
-          showDepthAsHeadline
-            ? "mt-3 text-4xl font-bold tracking-tight text-(--color-ink) sm:text-5xl"
-            : "mt-3 text-2xl font-bold tracking-tight text-(--color-ink)"
+          !headingIsVisual
+            ? "sr-only"
+            : heroDepth
+              ? "mt-3 text-4xl font-bold tracking-tight text-(--color-ink) sm:text-5xl"
+              : isStale && depth
+                ? "mt-3 text-xl font-semibold text-(--color-ink-muted)"
+                : "mt-3 text-2xl font-bold tracking-tight text-(--color-ink)"
         }
       >
-        {showDepthAsHeadline ? depth!.label : copy.headline}
+        {depth && depth.code !== "WALANG_BAHA" ? depth.label : copy.headline}
       </h2>
 
       {topReport && (
@@ -105,9 +124,12 @@ export function ResultCard({
       {(confidence.level !== "NONE" || otherReportsCount > 0) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           <ConfidenceBadge confidence={confidence} />
+          {/* No leading separator: at phone widths this wraps to its own
+              line, and a stranded "·" reads as a typo. The flex gap does
+              the separating instead. */}
           {otherReportsCount > 0 && (
             <span className="text-(--color-ink-faint)">
-              · {otherReportsCount} pang report sa loob ng 300m
+              {otherReportsCount} pang report sa loob ng 300m
             </span>
           )}
         </div>
@@ -144,7 +166,7 @@ export function ResultCard({
       {topReport && (
         <div className="mt-6 border-t border-(--color-border) pt-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--color-ink-faint)">
-            Tulong para sa susunod na motorista
+            Tulungan ang susunod
           </p>
           <ValidationControls report={topReport} onVoted={onReportUpdated} />
         </div>

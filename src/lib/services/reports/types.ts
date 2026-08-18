@@ -15,7 +15,7 @@ export interface CreateReportInput {
   province: string | null;
   floodDepth: FloodReport["floodDepth"];
   roadCondition: FloodReport["roadCondition"];
-  vehicleType: FloodReport["vehicleType"];
+  vehicleTypes: FloodReport["vehicleTypes"];
   /** UTC ISO string. */
   reportedAt: string;
   reporterName: string | null;

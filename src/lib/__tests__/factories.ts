@@ -26,7 +26,7 @@ export function makeReport(overrides: Overrides = {}): FloodReport {
     province: "Metro Manila",
     floodDepth: "GUTTER_DEEP",
     roadCondition: null,
-    vehicleType: null,
+    vehicleTypes: [],
     reportedAt: minutesAgoIso(minutesAgo),
     reporterName: null,
     anonymous: true,
