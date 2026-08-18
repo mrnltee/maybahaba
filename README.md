@@ -298,38 +298,63 @@ gating) — `node:crypto` works under `nodejs_compat`.
 ### 1. Set up Supabase
 
 Follow [Database setup](#database-setup-optional--supabase--postgis) above
-and run all four migrations in order (`0001` → `0004`). A real deployment
+and run all migrations in order (`0001` → `0006`). A real deployment
 **must** have Supabase configured: without it the app falls back to the
 in-memory mock provider, and on Workers each colo has its own isolate, so
-data would appear to change randomly between requests.
+data would appear to change randomly between requests — the app would be
+serving demo flood data as though it were real.
 
-### 2. Deploy the Worker
+### 2. Upload the server-side secrets — once, before the first deploy
+
+These are read by the Worker at **runtime**, so they belong in Cloudflare:
 
 ```bash
 npx wrangler login
-npm run deploy
-```
-
-`npm run preview` runs the same bundle locally in `workerd` first — worth
-doing before every deploy, since it catches runtime differences that
-`next dev` cannot.
-
-### 3. Upload secrets
-
-Environment variables are **not** read from `.env.local` in production.
-Upload each as a Worker secret:
-
-```bash
-npx wrangler secret put NEXT_PUBLIC_SUPABASE_URL
-npx wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
-npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npx wrangler secret put SUPABASE_SECRET_KEY
 npx wrangler secret put ADMIN_PASSCODE
 npx wrangler secret put ABUSE_HASH_SALT
 ```
 
+You only need to repeat this when a value changes, not on every deploy.
+
+### 3. The `NEXT_PUBLIC_*` values are NOT secrets — do not `wrangler secret put` them
+
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are
+**inlined into the JavaScript bundle when `next build` runs**, not read
+from the environment at runtime. Uploading them as Worker secrets has no
+effect on the already-compiled code, and the deployed site would silently
+fall back to mock data.
+
+They must instead be present **on the machine running the build**. Since
+`npm run deploy` builds locally, `.env.local` already supplies them — so
+there is nothing extra to do, as long as `.env.local` is populated before
+you run the deploy.
+
+If you later move the build into CI, set them as ordinary build-time
+environment variables in the CI job, not as Worker secrets.
+
+(This is also why the publishable key being visible in the browser is
+fine: it is *designed* to be public, and is restricted by row-level
+security. The secret key is the one that must never reach the client — it
+bypasses RLS entirely.)
+
+### 4. Deploy the Worker
+
+```bash
+npm run preview   # same bundle, locally in workerd — catches what `next dev` can't
+npm run deploy
+```
+
 For local `npm run preview`, copy `.dev.vars.example` to `.dev.vars`
-instead (gitignored). Note that `next dev` reads `.env.local` while the
-Workers runtime reads `.dev.vars` — keep both in sync.
+(gitignored). Note that `next dev` reads `.env.local` while the Workers
+runtime reads `.dev.vars` — keep both in sync.
+
+### 5. Check the deploy is real, not mock
+
+Open the deployed URL and submit one test report, then confirm it appears
+in Supabase's table editor. If the report vanishes on reload, or the map
+shows the demo Katipunan/EDSA reports, the build didn't pick up
+`NEXT_PUBLIC_SUPABASE_URL` — see step 3.
 
 ### Cost
 
