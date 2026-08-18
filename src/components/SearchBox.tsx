@@ -1,6 +1,7 @@
 "use client";
 
 import { useDebounce } from "@/hooks/useDebounce";
+import { distanceMeters, formatDistance } from "@/lib/geo";
 import type { LocationResult } from "@/lib/types";
 import { Loader2, MapPin, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -10,9 +11,21 @@ interface SearchBoxProps {
   onSelect: (location: LocationResult) => void;
   autoFocus?: boolean;
   initialValue?: string;
+  /**
+   * When known, suggestions show their distance from here and are sorted
+   * nearest-first. Omitted until the user opts into sharing location, so
+   * search works fully without it.
+   */
+  deviceLocation?: { latitude: number; longitude: number } | null;
 }
 
-export function SearchBox({ placeholder = "Enter a location...", onSelect, autoFocus, initialValue = "" }: SearchBoxProps) {
+export function SearchBox({
+  placeholder = "Enter a location...",
+  onSelect,
+  autoFocus,
+  initialValue = "",
+  deviceLocation = null,
+}: SearchBoxProps) {
   const [query, setQuery] = useState(initialValue);
   const [results, setResults] = useState<LocationResult[]>([]);
   const [open, setOpen] = useState(false);
@@ -26,6 +39,20 @@ export function SearchBox({ placeholder = "Enter a location...", onSelect, autoF
 
   const trimmedQuery = debouncedQuery.trim();
   const queryTooShort = trimmedQuery.length < 2;
+
+  /**
+   * With a known device location, nearest-first beats the geocoder's own
+   * relevance ranking: someone typing "Katipunan" almost always means the
+   * stretch they are near, not the one across the city.
+   */
+  const rankedResults = deviceLocation
+    ? results
+        .map((r) => ({
+          ...r,
+          _distance: distanceMeters(deviceLocation.latitude, deviceLocation.longitude, r.latitude, r.longitude),
+        }))
+        .sort((a, b) => a._distance - b._distance)
+    : results.map((r) => ({ ...r, _distance: null as number | null }));
 
   useEffect(() => {
     const trimmed = debouncedQuery.trim();
@@ -87,7 +114,7 @@ export function SearchBox({ placeholder = "Enter a location...", onSelect, autoF
       setActiveIndex((i) => Math.max(i - 1, 0));
     } else if (e.key === "Enter" && activeIndex >= 0) {
       e.preventDefault();
-      selectResult(results[activeIndex]);
+      selectResult(rankedResults[activeIndex]);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -139,7 +166,7 @@ export function SearchBox({ placeholder = "Enter a location...", onSelect, autoF
             </li>
           )}
           {!error &&
-            results.map((result, index) => (
+            rankedResults.map((result, index) => (
               <li key={result.id} role="option" aria-selected={index === activeIndex}>
                 <button
                   type="button"
@@ -150,7 +177,12 @@ export function SearchBox({ placeholder = "Enter a location...", onSelect, autoF
                   }`}
                 >
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-(--color-ink-faint)" aria-hidden="true" />
-                  <span className="text-(--color-ink)">{result.label}</span>
+                  <span className="min-w-0 flex-1 text-(--color-ink)">{result.label}</span>
+                  {result._distance !== null && (
+                    <span className="shrink-0 whitespace-nowrap text-xs text-(--color-ink-faint)">
+                      {formatDistance(result._distance)}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}

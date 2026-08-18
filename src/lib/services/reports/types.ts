@@ -1,4 +1,5 @@
 import type {
+  AreaBounds,
   CommunityAction,
   FloodReport,
   ReportStatus,
@@ -37,6 +38,12 @@ export interface PendingReportsFilter {
 export interface ReportService {
   /** Reports within `radiusMeters` of a point, most recent first, excludes DENIED. */
   getNearby(latitude: number, longitude: number, radiusMeters: number): Promise<FloodReport[]>;
+  /**
+   * Every report inside a geographic envelope — used for city/barangay/
+   * province searches. Geographic rather than name-matched so a geocoder
+   * name variant can never silently hide reports.
+   */
+  getInArea(bounds: AreaBounds, limit?: number): Promise<FloodReport[]>;
   getById(id: string): Promise<FloodReport | null>;
   create(input: CreateReportInput): Promise<FloodReport>;
   applyValidation(

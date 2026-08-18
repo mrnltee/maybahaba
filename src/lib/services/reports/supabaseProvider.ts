@@ -1,6 +1,6 @@
 import { REPORT_EXPIRY_MINUTES } from "@/lib/config/freshness";
 import { supabaseAdmin, supabasePublic } from "@/lib/supabaseClient";
-import type { CommunityAction, FloodReport, ValidationAction, VehicleTypeCode } from "@/lib/types";
+import type { AreaBounds, CommunityAction, FloodReport, ValidationAction, VehicleTypeCode } from "@/lib/types";
 import type { CreateReportInput, PendingReportsFilter, ReportService } from "./types";
 import { ReportServiceError } from "./types";
 
@@ -84,6 +84,19 @@ export class SupabaseReportProvider implements ReportService {
       radius_m: radiusMeters,
     });
     if (error) throw new ReportServiceError("Failed to fetch nearby reports", error);
+    return (data as ReportRow[]).map(rowToReport);
+  }
+
+  async getInArea(bounds: AreaBounds, limit = 200): Promise<FloodReport[]> {
+    if (!supabasePublic) throw new ReportServiceError("Supabase is not configured");
+    const { data, error } = await supabasePublic.rpc("reports_in_area", {
+      min_lat: bounds.minLat,
+      min_lon: bounds.minLon,
+      max_lat: bounds.maxLat,
+      max_lon: bounds.maxLon,
+      max_rows: limit,
+    });
+    if (error) throw new ReportServiceError("Failed to fetch reports in area", error);
     return (data as ReportRow[]).map(rowToReport);
   }
 

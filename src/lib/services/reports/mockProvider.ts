@@ -2,7 +2,7 @@ import { AUTO_FLAG_INACCURATE_THRESHOLD } from "@/lib/config/confidence";
 import { REPORT_EXPIRY_MINUTES } from "@/lib/config/freshness";
 import { getEffectiveTimestamp } from "@/lib/freshness";
 import { distanceMeters } from "@/lib/geo";
-import type { CommunityAction, FloodReport, ValidationAction } from "@/lib/types";
+import type { AreaBounds, CommunityAction, FloodReport, ValidationAction } from "@/lib/types";
 import { randomUUID } from "crypto";
 import type {
   CreateReportInput,
@@ -200,6 +200,21 @@ class MockReportProvider implements ReportService {
       .filter((r) => r.status !== "DENIED")
       .filter((r) => distanceMeters(latitude, longitude, r.latitude, r.longitude) <= radiusMeters)
       .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
+  }
+
+  async getInArea(bounds: AreaBounds, limit = 200): Promise<FloodReport[]> {
+    await this.sweepExpired();
+    return this.reports
+      .filter((r) => r.status !== "DENIED")
+      .filter(
+        (r) =>
+          r.latitude >= bounds.minLat &&
+          r.latitude <= bounds.maxLat &&
+          r.longitude >= bounds.minLon &&
+          r.longitude <= bounds.maxLon
+      )
+      .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime())
+      .slice(0, limit);
   }
 
   async getById(id: string): Promise<FloodReport | null> {

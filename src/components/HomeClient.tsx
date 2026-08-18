@@ -3,10 +3,15 @@
 import { Header } from "@/components/Header";
 import { MapViewLoader } from "@/components/MapViewLoader";
 import { ReportBahaModal } from "@/components/ReportBahaModal";
+import { AreaResultCard } from "@/components/AreaResultCard";
 import { ResultCard } from "@/components/ResultCard";
 import { ResultSkeleton } from "@/components/Skeleton";
 import { SearchBox } from "@/components/SearchBox";
-import type { FloodReport, LocationResult, NearbySearchResult } from "@/lib/types";
+import { SearchControls } from "@/components/SearchControls";
+import { useDeviceLocation } from "@/hooks/useDeviceLocation";
+import { NEARBY_RADIUS_METERS } from "@/lib/config/freshness";
+import { distanceMeters } from "@/lib/geo";
+import { isAreaSearch, type AreaSearchResult, type FloodReport, type LocationResult, type NearbySearchResult } from "@/lib/types";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -21,22 +26,38 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
   const [modalKey, setModalKey] = useState(0);
   const [selectedLocation, setSelectedLocation] = useState<LocationResult | null>(null);
   const [result, setResult] = useState<NearbySearchResult | null>(null);
+  const [areaResult, setAreaResult] = useState<AreaSearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
+  const [radiusMeters, setRadiusMeters] = useState<number>(NEARBY_RADIUS_METERS);
+  const device = useDeviceLocation();
 
-  async function handleSelectLocation(location: LocationResult) {
+  async function handleSelectLocation(location: LocationResult, radius: number = radiusMeters) {
     setSelectedLocation(location);
     setShowMap(false);
     setError(null);
     setLoading(true);
     setResult(null);
+    setAreaResult(null);
+
+    // A city/barangay/province has no single condition, so it gets a
+    // different query and a different answer shape (see AreaResultCard).
+    const area = isAreaSearch(location);
 
     try {
-      const res = await fetch(`/api/reports/nearby?lat=${location.latitude}&lng=${location.longitude}`);
+      const url = area
+        ? `/api/reports/in-area?minLat=${location.boundingBox!.minLat}&minLon=${location.boundingBox!.minLon}` +
+          `&maxLat=${location.boundingBox!.maxLat}&maxLon=${location.boundingBox!.maxLon}` +
+          `&label=${encodeURIComponent(location.label)}`
+        : `/api/reports/nearby?lat=${location.latitude}&lng=${location.longitude}&radius=${radius}`;
+
+      const res = await fetch(url);
       const data = await res.json();
       if (!res.ok) {
         setError(data.error ?? "Hindi available ang report service ngayon. Subukan ulit.");
+      } else if (area) {
+        setAreaResult(data);
       } else {
         setResult(data);
       }
@@ -48,7 +69,36 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
   }
 
   function refreshResult() {
-    if (selectedLocation) handleSelectLocation(selectedLocation);
+    if (selectedLocation) handleSelectLocation(selectedLocation, radiusMeters);
+  }
+
+  /** Changing the radius re-runs the current search rather than needing a re-search. */
+  function handleRadiusChange(meters: number) {
+    setRadiusMeters(meters);
+    if (selectedLocation) handleSelectLocation(selectedLocation, meters);
+  }
+
+  /** "Use my location" both grants distances and searches where you are. */
+  async function handleUseMyLocation() {
+    const loc = await device.request();
+    if (!loc) return;
+    let label = "Kasalukuyang lokasyon";
+    let street = null, barangay = null, city = null, province = null;
+    try {
+      const res = await fetch(`/api/search?lat=${loc.latitude}&lng=${loc.longitude}`);
+      const data = await res.json();
+      if (data.result) {
+        label = data.result.label;
+        street = data.result.street; barangay = data.result.barangay;
+        city = data.result.city; province = data.result.province;
+      }
+    } catch {
+      // Coordinates are enough to search with.
+    }
+    handleSelectLocation({
+      id: "device", label, latitude: loc.latitude, longitude: loc.longitude,
+      street, barangay, city, province, kind: "other",
+    });
   }
 
   function openReportModal(pin: { latitude: number; longitude: number } | null) {
@@ -91,7 +141,19 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
         </div>
 
         <div className="mx-auto mt-8 w-full max-w-xl">
-          <SearchBox onSelect={handleSelectLocation} autoFocus />
+          <SearchBox
+            onSelect={(loc) => handleSelectLocation(loc)}
+            autoFocus
+            deviceLocation={device.location}
+          />
+          <SearchControls
+            onSelectLocation={(loc) => handleSelectLocation(loc)}
+            onUseMyLocation={handleUseMyLocation}
+            locating={device.loading}
+            locationError={device.error}
+            radiusMeters={radiusMeters}
+            onRadiusChange={handleRadiusChange}
+          />
         </div>
 
         <div className="mx-auto mt-8 w-full max-w-xl">
@@ -103,6 +165,29 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
             </div>
           )}
 
+          {!loading && !error && areaResult && selectedLocation && (
+            <>
+              <AreaResultCard
+                result={areaResult}
+                locationLabel={selectedLocation.label}
+                deviceLocation={device.location}
+                onViewOnMap={() => setShowMap((v) => !v)}
+              />
+              {showMap && (
+                <div className="mt-4">
+                  <MapViewLoader
+                    center={{ latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }}
+                    reports={areaResult.reports}
+                    zoom={12}
+                    heightClassName="h-96"
+                    onReportUpdated={handleReportUpdated}
+                    onReportHere={(lat, lng) => openReportModal({ latitude: lat, longitude: lng })}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
           {!loading && !error && result && selectedLocation && (
             <>
               <ResultCard
@@ -110,6 +195,17 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
                 locationLabel={selectedLocation.label}
                 onViewOnMap={() => setShowMap((v) => !v)}
                 onReportUpdated={handleReportUpdated}
+                radiusMeters={radiusMeters}
+                distanceFromDevice={
+                  device.location
+                    ? distanceMeters(
+                        device.location.latitude,
+                        device.location.longitude,
+                        selectedLocation.latitude,
+                        selectedLocation.longitude
+                      )
+                    : null
+                }
               />
               {showMap && (
                 <div className="mt-4">
@@ -119,13 +215,14 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
                     focusedReportId={result.topReport?.id ?? null}
                     onReportUpdated={handleReportUpdated}
                     onReportHere={(lat, lng) => openReportModal({ latitude: lat, longitude: lng })}
+                    radiusMeters={radiusMeters}
                   />
                 </div>
               )}
             </>
           )}
 
-          {!loading && !error && !result && (
+          {!loading && !error && !result && !areaResult && (
             <p className="text-center text-sm text-(--color-ink-faint)">
               Maghanap ng lokasyon para makita ang pinakabagong report ng baha doon.
             </p>

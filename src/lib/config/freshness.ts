@@ -31,8 +31,25 @@ export const FRESHNESS_LABELS: Record<
  */
 export const REPORT_EXPIRY_MINUTES = FRESHNESS_THRESHOLDS_MINUTES.STALE_MAX;
 
-/** Radius used for "nearby reports" / duplicate detection (spec section 6, 14). */
+/** Default radius for "nearby reports" (spec section 6, 14). */
 export const NEARBY_RADIUS_METERS = 300;
+
+/**
+ * Radii a user can widen the search to.
+ *
+ * 300 m is the default because it is roughly "this stretch of road" — the
+ * question a motorist is actually asking. Wider radii answer a different
+ * question ("is my whole route affected?") and are opt-in, because a
+ * 10 km result set says almost nothing about the specific street you are
+ * about to turn onto.
+ */
+export const SEARCH_RADIUS_OPTIONS_METERS = [300, 500, 1000, 2000, 5000, 10000] as const;
+export const MIN_SEARCH_RADIUS_METERS = 300;
+export const MAX_SEARCH_RADIUS_METERS = 10000;
+
+export function formatRadius(meters: number): string {
+  return meters >= 1000 ? `${meters / 1000} km` : `${meters} m`;
+}
 
 /** Radius used for possible-duplicate (same time, nearby location) checks. */
 export const DUPLICATE_NEARBY_RADIUS_METERS = 300;

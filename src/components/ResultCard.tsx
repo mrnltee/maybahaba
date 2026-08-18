@@ -6,6 +6,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { CommunitySignals, ValidationControls } from "@/components/ValidationControls";
 import { ExternalMapLinks } from "@/components/ExternalMapLinks";
 import { conciseLocationLabel, wasShortened } from "@/lib/formatLocation";
+import { formatRadius } from "@/lib/config/freshness";
+import { formatDistance } from "@/lib/geo";
 import { getFloodDepthOption } from "@/lib/types";
 import { formatPhTime, formatRelativeTime } from "@/lib/time";
 import { STATUS_COPY } from "@/lib/status";
@@ -33,11 +35,17 @@ export function ResultCard({
   locationLabel,
   onViewOnMap,
   onReportUpdated,
+  radiusMeters,
+  distanceFromDevice = null,
 }: {
   result: NearbySearchResult;
   locationLabel: string;
   onViewOnMap: () => void;
   onReportUpdated?: (report: FloodReport) => void;
+  /** The radius this result actually covers — the copy used to hardcode 300m. */
+  radiusMeters: number;
+  /** Distance from the user, when they've shared their location. */
+  distanceFromDevice?: number | null;
 }) {
   const { topReport, status, confidence, nearbyReports } = result;
   const copy = STATUS_COPY[status];
@@ -80,6 +88,12 @@ export function ResultCard({
           <MapPinned className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span title={wasShortened(displayLabel, locationLabel) ? locationLabel : undefined}>
             {displayLabel}
+            {distanceFromDevice !== null && (
+              <span className="text-(--color-ink-faint)">
+                {" · "}
+                {formatDistance(distanceFromDevice)} mula sa iyo
+              </span>
+            )}
           </span>
         </p>
         {topReport?.isDemoData && <DemoDataBadge />}
@@ -129,7 +143,7 @@ export function ResultCard({
               the separating instead. */}
           {otherReportsCount > 0 && (
             <span className="text-(--color-ink-faint)">
-              {otherReportsCount} pang report sa loob ng 300m
+              {otherReportsCount} pang report sa loob ng {formatRadius(radiusMeters)}
             </span>
           )}
         </div>

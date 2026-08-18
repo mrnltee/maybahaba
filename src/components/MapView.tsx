@@ -23,6 +23,12 @@ interface MapViewProps {
    * a report there. Omit to make the map read-only.
    */
   onReportHere?: (latitude: number, longitude: number) => void;
+  /**
+   * Draws the search radius as a circle so the answer's scope is visible.
+   * Without it, "3 reports nearby" gives no sense of how much ground that
+   * covers — 300 m and 10 km look identical on a card.
+   */
+  radiusMeters?: number | null;
 }
 
 /**
@@ -43,11 +49,13 @@ export function MapView({
   onReportUpdated,
   allowValidation = true,
   onReportHere,
+  radiusMeters = null,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
   const rootsRef = useRef<Root[]>([]);
+  const radiusCircleRef = useRef<L.Circle | null>(null);
   const onReportUpdatedRef = useRef(onReportUpdated);
   const onReportHereRef = useRef(onReportHere);
   /** Transient "you tapped here" pin, replaced on each new tap. */
@@ -123,6 +131,23 @@ export function MapView({
       markersRef.current = [];
       rootsRef.current.forEach((root) => queueMicrotask(() => root.unmount()));
       rootsRef.current = [];
+
+      // Search-radius circle, drawn beneath the markers.
+      radiusCircleRef.current?.remove();
+      radiusCircleRef.current = null;
+      if (radiusMeters && radiusMeters > 0) {
+        radiusCircleRef.current = L.circle([center.latitude, center.longitude], {
+          radius: radiusMeters,
+          color: "#0f5c73",
+          weight: 1.5,
+          opacity: 0.7,
+          fillColor: "#0f5c73",
+          fillOpacity: 0.07,
+          interactive: false,
+        }).addTo(mapRef.current);
+        // Frame the circle so the whole search area is visible at once.
+        mapRef.current.fitBounds(radiusCircleRef.current.getBounds(), { padding: [16, 16] });
+      }
 
       // Center marker (the searched location).
       const centerIcon = L.divIcon({
@@ -201,12 +226,13 @@ export function MapView({
     return () => {
       cancelled = true;
     };
-  }, [center.latitude, center.longitude, zoom, reports, focusedReportId, allowValidation]);
+  }, [center.latitude, center.longitude, zoom, reports, focusedReportId, allowValidation, radiusMeters]);
 
   useEffect(() => {
     return () => {
       rootsRef.current.forEach((root) => queueMicrotask(() => root.unmount()));
       rootsRef.current = [];
+      radiusCircleRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };

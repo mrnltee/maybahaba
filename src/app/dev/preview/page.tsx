@@ -1,7 +1,8 @@
 "use client";
 
+import { AreaResultCard } from "@/components/AreaResultCard";
 import { ResultCard } from "@/components/ResultCard";
-import type { FloodReport, NearbySearchResult } from "@/lib/types";
+import type { AreaSearchResult, FloodReport, NearbySearchResult } from "@/lib/types";
 import { notFound } from "next/navigation";
 
 /**
@@ -133,6 +134,41 @@ const SCENARIOS = [
   ),
 ];
 
+const QC_BOUNDS = { minLat: 14.58, minLon: 120.98, maxLat: 14.78, maxLon: 121.14 };
+
+const AREA_SCENARIOS: { name: string; result: AreaSearchResult; label: string }[] = [
+  {
+    name: "City with several reports",
+    label: "Quezon City, Metro Manila",
+    result: {
+      bounds: QC_BOUNDS,
+      label: "Quezon City",
+      totalReports: 5,
+      impassableCount: 2,
+      severeCount: 3,
+      reports: [
+        report({ id: "a", latitude: 14.6910, longitude: 121.0740, floodDepth: "HINDI_MADAANAN", locationName: "Commonwealth Avenue, Quezon City", street: "Commonwealth Avenue", reportedAt: minutesAgo(6) }),
+        report({ id: "b", latitude: 14.6740, longitude: 121.0490, floodDepth: "HINDI_MADAANAN", locationName: "Tandang Sora Avenue, Quezon City", street: "Tandang Sora Avenue", reportedAt: minutesAgo(14) }),
+        report({ id: "c", latitude: 14.6349, longitude: 121.0645, floodDepth: "TUHOD", locationName: "Katipunan Avenue, Quezon City", street: "Katipunan Avenue", reportedAt: minutesAgo(22) }),
+        report({ id: "d", latitude: 14.6220, longitude: 121.0310, floodDepth: "GUTTER_DEEP", locationName: "Aurora Boulevard, Quezon City", street: "Aurora Boulevard", reportedAt: minutesAgo(35) }),
+        report({ id: "e", latitude: 14.6510, longitude: 121.0290, floodDepth: "WALANG_BAHA", locationName: "Quezon Avenue, Quezon City", street: "Quezon Avenue", reportedAt: minutesAgo(50), isDemoData: false }),
+      ],
+    },
+  },
+  {
+    name: "City with nothing reported (must not imply safety)",
+    label: "Pasig City, Metro Manila",
+    result: {
+      bounds: QC_BOUNDS,
+      label: "Pasig City",
+      totalReports: 0,
+      impassableCount: 0,
+      severeCount: 0,
+      reports: [],
+    },
+  },
+];
+
 export default function PreviewPage() {
   if (process.env.NODE_ENV === "production") notFound();
 
@@ -148,7 +184,29 @@ export default function PreviewPage() {
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--color-ink-faint)">
               {s.name}
             </h2>
-            <ResultCard result={s.result} locationLabel={s.locationLabel} onViewOnMap={() => {}} />
+            <ResultCard
+              result={s.result}
+              locationLabel={s.locationLabel}
+              onViewOnMap={() => {}}
+              radiusMeters={300}
+            />
+          </section>
+        ))}
+      </div>
+
+      <h1 className="mt-12 text-lg font-bold text-(--color-ink)">AreaResultCard states</h1>
+      <div className="mt-4 space-y-10">
+        {AREA_SCENARIOS.map((s2) => (
+          <section key={s2.name} data-scenario={s2.name}>
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--color-ink-faint)">
+              {s2.name}
+            </h2>
+            <AreaResultCard
+              result={s2.result}
+              locationLabel={s2.label}
+              deviceLocation={{ latitude: 14.63, longitude: 121.06 }}
+              onViewOnMap={() => {}}
+            />
           </section>
         ))}
       </div>

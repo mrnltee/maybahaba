@@ -90,6 +90,8 @@ interface NominatimAddress {
 
 interface NominatimResult {
   place_id: number;
+  /** [minLat, maxLat, minLon, maxLon] as strings. */
+  boundingbox?: [string, string, string, string];
   lat: string;
   lon: string;
   display_name: string;
@@ -125,6 +127,14 @@ function toLocationResult(raw: NominatimResult): LocationResult {
     city,
     province,
     kind: classifyKind(raw.type, raw.class),
+    boundingBox: raw.boundingbox
+      ? {
+          minLat: parseFloat(raw.boundingbox[0]),
+          maxLat: parseFloat(raw.boundingbox[1]),
+          minLon: parseFloat(raw.boundingbox[2]),
+          maxLon: parseFloat(raw.boundingbox[3]),
+        }
+      : null,
   };
 }
 

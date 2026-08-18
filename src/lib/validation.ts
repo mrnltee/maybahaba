@@ -69,5 +69,26 @@ export const searchQuerySchema = z.object({
 export const nearbyQuerySchema = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
-  radius: z.coerce.number().min(1).max(5000).optional(),
+  // Bounds mirror MIN/MAX_SEARCH_RADIUS_METERS in config/freshness.
+  radius: z.coerce.number().min(300).max(10000).optional(),
 });
+
+/**
+ * Area search bounds. Bounded in size as well as validity: an envelope
+ * spanning the whole country would return an unbounded result set and
+ * answer nobody's question.
+ */
+export const areaQuerySchema = z
+  .object({
+    minLat: z.coerce.number().min(-90).max(90),
+    minLon: z.coerce.number().min(-180).max(180),
+    maxLat: z.coerce.number().min(-90).max(90),
+    maxLon: z.coerce.number().min(-180).max(180),
+    label: z.string().trim().max(200).optional().default(""),
+  })
+  .refine((b) => b.maxLat > b.minLat && b.maxLon > b.minLon, {
+    message: "Bounds must be non-empty and correctly ordered",
+  })
+  .refine((b) => b.maxLat - b.minLat <= 5 && b.maxLon - b.minLon <= 5, {
+    message: "Area too large",
+  });

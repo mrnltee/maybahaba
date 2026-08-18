@@ -274,6 +274,46 @@ export interface LocationResult {
   province: string | null;
   /** Rough relevance category used for client-side ranking bias. */
   kind: "street" | "address" | "barangay" | "city" | "province" | "landmark" | "other";
+  /**
+   * Geographic extent, present for administrative places (barangay, city,
+   * province). Its presence is what makes an "area search" possible.
+   *
+   * Deliberately geographic rather than matching reports on a `city` text
+   * field: geocoders return name variants ("Quezon City" / "Lungsod
+   * Quezon"), and a name mismatch would silently drop flood reports —
+   * the most dangerous way this app could fail.
+   */
+  boundingBox?: AreaBounds | null;
+}
+
+/** South-west / north-east corners, as returned by the geocoder. */
+export interface AreaBounds {
+  minLat: number;
+  minLon: number;
+  maxLat: number;
+  maxLon: number;
+}
+
+/** Administrative kinds worth answering with an area summary rather than one card. */
+export const AREA_KINDS = ["barangay", "city", "province"] as const;
+
+export function isAreaSearch(location: {
+  kind: LocationResult["kind"];
+  boundingBox?: AreaBounds | null;
+}): boolean {
+  return Boolean(
+    location.boundingBox && (AREA_KINDS as readonly string[]).includes(location.kind)
+  );
+}
+
+/** Aggregate answer for a whole area — never a single condition claim. */
+export interface AreaSearchResult {
+  bounds: AreaBounds;
+  label: string;
+  totalReports: number;
+  impassableCount: number;
+  severeCount: number;
+  reports: FloodReport[];
 }
 
 export interface NearbySearchResult {
