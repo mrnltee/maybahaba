@@ -4,6 +4,8 @@ import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { DemoDataBadge } from "@/components/DemoDataBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { CommunitySignals, ValidationControls } from "@/components/ValidationControls";
+import { ExternalMapLinks } from "@/components/ExternalMapLinks";
+import { conciseLocationLabel, wasShortened } from "@/lib/formatLocation";
 import { getFloodDepthOption } from "@/lib/types";
 import { formatPhTime, formatRelativeTime } from "@/lib/time";
 import { STATUS_COPY } from "@/lib/status";
@@ -25,6 +27,12 @@ export function ResultCard({
   const copy = STATUS_COPY[status];
   const depth = topReport ? getFloodDepthOption(topReport.floodDepth) : null;
   const otherReportsCount = Math.max(0, nearbyReports.length - (topReport ? 1 : 0));
+
+  // Prefer the report's own structured address fields; fall back to the
+  // searched location's raw label when there is no report yet.
+  const displayLabel = topReport
+    ? conciseLocationLabel(topReport, topReport.locationName)
+    : conciseLocationLabel({}, locationLabel);
 
   return (
     <section
@@ -71,7 +79,11 @@ export function ResultCard({
 
       <div className="mt-2 flex items-start gap-2 text-sm text-(--color-ink-muted)">
         <MapPinned className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <span>{locationLabel}</span>
+        {/* Short label for glanceability; full geocoder string kept as a
+            tooltip so the exact match is still verifiable. */}
+        <span title={wasShortened(displayLabel, locationLabel) ? locationLabel : undefined}>
+          {displayLabel}
+        </span>
       </div>
 
       {confidence.level !== "NONE" && (
@@ -99,6 +111,16 @@ export function ResultCard({
       >
         View on Map
       </button>
+
+      {topReport && (
+        <div className="mt-4">
+          <ExternalMapLinks
+            latitude={topReport.latitude}
+            longitude={topReport.longitude}
+            label={topReport.locationName}
+          />
+        </div>
+      )}
 
       {topReport && (
         <div className="mt-6 border-t border-(--color-border) pt-4">

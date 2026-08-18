@@ -20,12 +20,18 @@ import {
 import { getFloodDepthOption } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/time";
 import { CheckCircle2, LocateFixed, Map as MapIcon, TriangleAlert } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 interface ReportBahaModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: (report: FloodReport) => void;
+  /**
+   * Pre-fills the location, e.g. when the user tapped a spot on the map.
+   * Consumed as initial state, so the caller should remount the modal
+   * (via a changing `key`) to apply a new one.
+   */
+  initialLocation?: { latitude: number; longitude: number } | null;
 }
 
 type SelectedLocation = {
@@ -45,12 +51,24 @@ type SubmitState =
   | { kind: "error"; message: string }
   | { kind: "success"; report: FloodReport };
 
-export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalProps) {
+export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: ReportBahaModalProps) {
   const titleId = useId();
   const { getCurrentPosition, loading: locating } = useGeolocation();
 
-  const [location, setLocation] = useState<SelectedLocation | null>(null);
-  const [showMap, setShowMap] = useState(false);
+  const [location, setLocation] = useState<SelectedLocation | null>(
+    initialLocation
+      ? {
+          latitude: initialLocation.latitude,
+          longitude: initialLocation.longitude,
+          label: "Naka-pin na lokasyon",
+          street: null,
+          barangay: null,
+          city: null,
+          province: null,
+        }
+      : null
+  );
+  const [showMap, setShowMap] = useState(Boolean(initialLocation));
   const [locationError, setLocationError] = useState<string | null>(null);
 
   const [reportedAtLocal, setReportedAtLocal] = useState(() => utcIsoToPhLocalInput(new Date().toISOString()));
@@ -150,6 +168,17 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
       // Keep the pin even if reverse geocoding fails — coordinates are still valid.
     }
   }
+
+  // When the user arrived here by tapping the map, resolve those raw
+  // coordinates into a readable address so the report isn't filed as
+  // "Naka-pin na lokasyon". Runs once per mount; the caller remounts via
+  // `key` when the pinned location changes.
+  useEffect(() => {
+    if (initialLocation) {
+      void handlePinChange(initialLocation.latitude, initialLocation.longitude);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function openBlankMap() {
     setLocation((prev) => prev ?? { ...METRO_MANILA_CENTER, label: "", street: null, barangay: null, city: null, province: null });

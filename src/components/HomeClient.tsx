@@ -12,6 +12,13 @@ import { useState } from "react";
 
 export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  /**
+   * Coordinates the user tapped on the map, pre-filled into the report
+   * form. `modalKey` remounts the modal so those coordinates are picked
+   * up as fresh initial state rather than needing a sync effect.
+   */
+  const [pinnedLocation, setPinnedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [modalKey, setModalKey] = useState(0);
   const [selectedLocation, setSelectedLocation] = useState<LocationResult | null>(null);
   const [result, setResult] = useState<NearbySearchResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,6 +51,12 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
     if (selectedLocation) handleSelectLocation(selectedLocation);
   }
 
+  function openReportModal(pin: { latitude: number; longitude: number } | null) {
+    setPinnedLocation(pin);
+    setModalKey((k) => k + 1);
+    setReportModalOpen(true);
+  }
+
   /**
    * Patch a single report in place after someone confirms it, so the
    * counts and "huling kumpirmado" update immediately without refetching
@@ -63,7 +76,7 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
 
   return (
     <>
-      <Header onReportClick={() => setReportModalOpen(true)} />
+      <Header onReportClick={() => openReportModal(null)} />
 
       <main id="main-content" className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-10 sm:px-6 sm:py-16">
         {isUsingMockData && (
@@ -105,6 +118,7 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
                     reports={result.nearbyReports}
                     focusedReportId={result.topReport?.id ?? null}
                     onReportUpdated={handleReportUpdated}
+                    onReportHere={(lat, lng) => openReportModal({ latitude: lat, longitude: lng })}
                   />
                 </div>
               )}
@@ -129,9 +143,11 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
       </footer>
 
       <ReportBahaModal
+        key={modalKey}
         open={reportModalOpen}
         onClose={() => setReportModalOpen(false)}
         onSuccess={refreshResult}
+        initialLocation={pinnedLocation}
       />
     </>
   );
