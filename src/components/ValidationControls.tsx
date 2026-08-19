@@ -5,7 +5,7 @@ import type { CommunityAction, FloodReport } from "@/lib/types";
 import { Check, X } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 
-interface ValidationControlsProps {
+interface AccuracyControlsProps {
   report: FloodReport;
   /** Compact styling for use inside a Leaflet map popup. */
   compact?: boolean;
@@ -15,17 +15,20 @@ interface ValidationControlsProps {
 type VoteState = "idle" | "sending" | "done" | "already" | "error";
 
 /**
- * Public community validation (spec section 16).
+ * "Was this report right?" — the accuracy half of community validation
+ * (spec section 16).
  *
- * Two independent questions, shown as separate rows because they mean
- * different things — a report can be accurate but no longer current.
- * Both are optional and require no account.
+ * The currency half ("is it still flooded?") moved to FollowUpFlow,
+ * which turns it into a real status update rather than a tally. This
+ * stayed separate on purpose: a report can be perfectly accurate and no
+ * longer current, and only *this* question should flag something for a
+ * moderator or grey it out on the map.
  *
- * Accessibility: each row is a labelled group, buttons carry explicit
- * text (not icon-only), and the resulting state is announced via
- * aria-live rather than being conveyed by colour alone.
+ * Accessibility: the row is a labelled group, buttons carry explicit
+ * text (not icon-only), and the result is announced via aria-live rather
+ * than being conveyed by colour alone.
  */
-export function ValidationControls({ report, compact = false, onVoted }: ValidationControlsProps) {
+export function AccuracyControls({ report, compact = false, onVoted }: AccuracyControlsProps) {
   const [state, setState] = useState<VoteState>("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -98,33 +101,6 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
 
   return (
     <div className={compact ? "space-y-1.5" : "space-y-2.5"}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          id={`currency-${report.id}`}
-          className={`text-(--color-ink-muted) ${compact ? "text-[11px]" : "text-xs"}`}
-        >
-          Baha pa rin ba?
-        </span>
-        <div role="group" aria-labelledby={`currency-${report.id}`} className="flex gap-1.5">
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => vote("STILL_FLOODED")}
-            className={`${buttonBase} border-(--color-border-strong) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
-          >
-            Oo, may baha pa
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => vote("NO_LONGER_FLOODED")}
-            className={`${buttonBase} border-(--color-border-strong) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
-          >
-            Wala na
-          </button>
-        </div>
-      </div>
-
       <div className="flex flex-wrap items-center gap-2">
         <span
           id={`accuracy-${report.id}`}

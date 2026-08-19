@@ -26,6 +26,7 @@ interface ReportRow {
   road_condition: FloodReport["roadCondition"];
   vehicle_type: VehicleTypeCode | null;
   vehicle_types: VehicleTypeCode[] | null;
+  follow_up_to: string | null;
   reported_at: string;
   reporter_name: string | null;
   anonymous: boolean;
@@ -57,6 +58,7 @@ function rowToReport(row: ReportRow): FloodReport {
     // Prefer the array column; fall back to the legacy single value so
     // pre-migration rows still render (see migration 0005).
     vehicleTypes: row.vehicle_types ?? (row.vehicle_type ? [row.vehicle_type] : []),
+    followUpTo: row.follow_up_to ?? null,
     reportedAt: row.reported_at,
     reporterName: row.reporter_name,
     anonymous: row.anonymous,
@@ -122,6 +124,7 @@ export class SupabaseReportProvider implements ReportService {
         flood_depth: input.floodDepth,
         road_condition: input.roadCondition,
         vehicle_types: input.vehicleTypes,
+        follow_up_to: input.followUpTo ?? null,
         reported_at: input.reportedAt,
         reporter_name: input.reporterName,
         anonymous: input.anonymous,

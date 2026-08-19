@@ -11,7 +11,7 @@ import { SearchBox } from "@/components/SearchBox";
 import { SearchControls } from "@/components/SearchControls";
 import { useDeviceLocation } from "@/hooks/useDeviceLocation";
 import { NEARBY_RADIUS_METERS } from "@/lib/config/freshness";
-import { distanceMeters } from "@/lib/geo";
+import { METRO_MANILA_CENTER, distanceMeters } from "@/lib/geo";
 import { isAreaSearch, type AreaSearchResult, type FloodReport, type LocationResult, type NearbySearchResult } from "@/lib/types";
 import Link from "next/link";
 import { useState } from "react";
@@ -30,13 +30,24 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
   const [areaResult, setAreaResult] = useState<AreaSearchResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showMap, setShowMap] = useState(false);
+  /**
+   * Which map is open, and why — not just whether one is.
+   *
+   * The spec calls for "open map" to centre on the user, EXCEPT when the
+   * map was opened from a result card, which must stay on the report
+   * being read. Storing the reason rather than a bare boolean is what
+   * stops a later "always centre on the user" convenience from silently
+   * overriding that: there is one place that decides the centre, and it
+   * can see where the request came from.
+   */
+  const [mapOpen, setMapOpen] = useState<null | { source: "result-card" | "default" }>(null);
+  const showMap = mapOpen !== null;
   const [radiusMeters, setRadiusMeters] = useState<number>(NEARBY_RADIUS_METERS);
   const device = useDeviceLocation();
 
   async function handleSelectLocation(location: LocationResult, radius: number = radiusMeters) {
     setSelectedLocation(location);
-    setShowMap(false);
+    setMapOpen(null);
     setError(null);
     setLoading(true);
     setResult(null);
@@ -102,6 +113,33 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
     });
   }
 
+  /**
+   * Where the embedded map centres.
+   *
+   * Opened from a result card, it centres on the thing that card is
+   * about — the top report's own coordinates when there is one, since
+   * that is the pin the reader is asking to see, falling back to the
+   * searched point. Opened any other way it centres on the user.
+   *
+   * Deliberately derived in one place rather than passed per call site:
+   * `onMapOpen → getCurrentLocation()` sprinkled around is exactly the
+   * pattern that breaks the result-card case.
+   */
+  const mapCenter = (() => {
+    if (mapOpen?.source === "result-card") {
+      const focus = result?.topReport;
+      if (focus) return { latitude: focus.latitude, longitude: focus.longitude };
+      if (selectedLocation) {
+        return { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude };
+      }
+    }
+    if (device.location) return device.location;
+    if (selectedLocation) {
+      return { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude };
+    }
+    return METRO_MANILA_CENTER;
+  })();
+
   function openReportModal(pin: { latitude: number; longitude: number } | null) {
     setPinnedLocation(pin);
     setModalKey((k) => k + 1);
@@ -154,6 +192,8 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
             locationError={device.error}
             radiusMeters={radiusMeters}
             onRadiusChange={handleRadiusChange}
+            deviceLocation={device.location}
+            requestDeviceLocation={device.request}
           />
         </div>
 
@@ -172,12 +212,14 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
                 result={areaResult}
                 locationLabel={selectedLocation.label}
                 deviceLocation={device.location}
-                onViewOnMap={() => setShowMap((v) => !v)}
+                onViewOnMap={() =>
+                  setMapOpen((v) => (v ? null : { source: "result-card" }))
+                }
               />
               {showMap && (
                 <div className="mt-4">
                   <MapViewLoader
-                    center={{ latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }}
+                    center={mapCenter}
                     reports={areaResult.reports}
                     zoom={12}
                     heightClassName="h-96"
@@ -194,7 +236,9 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
               <ResultCard
                 result={result}
                 locationLabel={selectedLocation.label}
-                onViewOnMap={() => setShowMap((v) => !v)}
+                onViewOnMap={() =>
+                  setMapOpen((v) => (v ? null : { source: "result-card" }))
+                }
                 onReportUpdated={handleReportUpdated}
                 radiusMeters={radiusMeters}
                 distanceFromDevice={
@@ -211,7 +255,7 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
               {showMap && (
                 <div className="mt-4">
                   <MapViewLoader
-                    center={{ latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }}
+                    center={mapCenter}
                     reports={result.nearbyReports}
                     focusedReportId={result.topReport?.id ?? null}
                     onReportUpdated={handleReportUpdated}

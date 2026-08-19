@@ -21,6 +21,13 @@ export interface CreateReportInput {
   reportedAt: string;
   reporterName: string | null;
   anonymous: boolean;
+  /**
+   * Set when this report answers an earlier one via "Tulungan ang
+   * susunod". A follow-up is always a new row — the original reporter's
+   * observation was true when they made it, so it is preserved rather
+   * than edited.
+   */
+  followUpTo?: string | null;
 }
 
 export interface PendingReportsFilter {

@@ -1,6 +1,7 @@
 "use client";
 
-import { ValidationControls } from "@/components/ValidationControls";
+import { FollowUpFlow } from "@/components/FollowUpFlow";
+import { AccuracyControls } from "@/components/ValidationControls";
 import { DEPTH_MAP_COLOR, DISPUTED_MAP_COLOR, MAP_LEGEND, isDisputed } from "@/lib/mapColors";
 import { formatRelativeTime } from "@/lib/time";
 import { getFloodDepthOption, type FloodReport } from "@/lib/types";
@@ -217,11 +218,18 @@ export function MapView({
             const root = createRoot(mount);
             rootsRef.current.push(root);
             root.render(
-              <ValidationControls
-                report={report}
-                compact
-                onVoted={(updated) => onReportUpdatedRef.current?.(updated)}
-              />
+              <div className="space-y-2">
+                <FollowUpFlow
+                  report={report}
+                  compact
+                  onUpdated={(updated: FloodReport) => onReportUpdatedRef.current?.(updated)}
+                />
+                <AccuracyControls
+                  report={report}
+                  compact
+                  onVoted={(updated: FloodReport) => onReportUpdatedRef.current?.(updated)}
+                />
+              </div>
             );
           });
         }

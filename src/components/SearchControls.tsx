@@ -14,6 +14,14 @@ interface SearchControlsProps {
   locationError: string | null;
   radiusMeters: number;
   onRadiusChange: (meters: number) => void;
+  /**
+   * The device location, if we already have it. Passed in rather than
+   * requested here so opening the pin map never triggers a second
+   * permission prompt for something the app already knows.
+   */
+  deviceLocation: { latitude: number; longitude: number } | null;
+  /** Asks for the device location; resolves null if unavailable. */
+  requestDeviceLocation: () => Promise<{ latitude: number; longitude: number } | null>;
 }
 
 /**
@@ -30,9 +38,42 @@ export function SearchControls({
   locationError,
   radiusMeters,
   onRadiusChange,
+  deviceLocation,
+  requestDeviceLocation,
 }: SearchControlsProps) {
   const [pinning, setPinning] = useState(false);
+  /**
+   * Where the pin map opens.
+   *
+   * Starts at the Metro Manila centroid only as a last resort. Opening a
+   * pin map on a city centroid means almost every user's first action is
+   * to pan away from it, so `openPinMap` replaces this with the device
+   * location before the map mounts whenever it can.
+   */
   const [pin, setPin] = useState({ ...METRO_MANILA_CENTER });
+  const [centeringOnDevice, setCenteringOnDevice] = useState(false);
+
+  async function openPinMap() {
+    if (pinning) {
+      setPinning(false);
+      return;
+    }
+
+    // Reuse a location we already hold rather than re-prompting.
+    if (deviceLocation) {
+      setPin({ ...deviceLocation });
+      setPinning(true);
+      return;
+    }
+
+    setCenteringOnDevice(true);
+    const here = await requestDeviceLocation();
+    setCenteringOnDevice(false);
+    // A refusal is not an error here — the map still opens, just on the
+    // fallback centre, and the user can pan.
+    if (here) setPin({ ...here });
+    setPinning(true);
+  }
 
   async function confirmPin() {
     // Resolve the dropped pin into a readable place name before handing
@@ -87,12 +128,13 @@ export function SearchControls({
 
         <button
           type="button"
-          onClick={() => setPinning((v) => !v)}
+          onClick={() => void openPinMap()}
+          disabled={centeringOnDevice}
           aria-expanded={pinning}
           className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-(--color-border-strong) px-4 py-2 text-sm font-medium text-(--color-ink) hover:bg-(--color-surface)"
         >
           <MapIcon className="h-4 w-4" aria-hidden="true" />
-          {pinning ? "Isara ang mapa" : "Pin on map"}
+          {pinning ? "Isara ang mapa" : centeringOnDevice ? "Kinukuha…" : "Pin on map"}
         </button>
 
         <label className="ml-auto inline-flex min-h-11 items-center gap-2 text-sm text-(--color-ink-muted)">

@@ -3,7 +3,8 @@
 import { ConfidenceBadge } from "@/components/ConfidenceBadge";
 import { DemoDataBadge } from "@/components/DemoDataBadge";
 import { StatusBadge } from "@/components/StatusBadge";
-import { CommunitySignals, ValidationControls } from "@/components/ValidationControls";
+import { FollowUpFlow } from "@/components/FollowUpFlow";
+import { AccuracyControls, CommunitySignals } from "@/components/ValidationControls";
 import { ExternalMapLinks } from "@/components/ExternalMapLinks";
 import { conciseLocationLabel, wasShortened } from "@/lib/formatLocation";
 import { formatRadius } from "@/lib/config/freshness";
@@ -182,7 +183,13 @@ export function ResultCard({
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-(--color-ink-faint)">
             Tulungan ang susunod
           </p>
-          <ValidationControls report={topReport} onVoted={onReportUpdated} />
+          <FollowUpFlow report={topReport} onUpdated={onReportUpdated} />
+          {/* Accuracy stays a separate question: "this report is wrong"
+              and "conditions have changed" are different claims, and only
+              the former should flag a report for moderation. */}
+          <div className="mt-3 border-t border-(--color-border) pt-3">
+            <AccuracyControls report={topReport} onVoted={onReportUpdated} />
+          </div>
         </div>
       )}
     </section>

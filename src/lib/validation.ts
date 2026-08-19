@@ -92,3 +92,22 @@ export const areaQuerySchema = z
   .refine((b) => b.maxLat - b.minLat <= 5 && b.maxLon - b.minLon <= 5, {
     message: "Area too large",
   });
+
+/**
+ * "Tulungan ang susunod" follow-up. Only the new condition is accepted —
+ * the location is copied from the report being answered, server-side, so
+ * a follow-up can never place a report somewhere the client chooses.
+ */
+export const followUpSchema = z.object({
+  floodDepth: z.enum([
+    "WALANG_BAHA",
+    "GUTTER_DEEP",
+    "BUKONG_BUKONG",
+    "BINTI",
+    "TUHOD",
+    "HITA",
+    "BAYWANG",
+    "HINDI_MADAANAN",
+    "HUMUPA_NA",
+  ]),
+});

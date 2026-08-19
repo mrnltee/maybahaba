@@ -1,3 +1,4 @@
+import { DEPTH_MAP_COLOR } from "@/lib/mapColors";
 import { getFloodDepthOption, type FloodDepthCode } from "@/lib/types";
 
 /**
@@ -29,17 +30,12 @@ export function DepthIcon({
   const waterHeight = frameHeight * fraction;
   const waterY = frameTop + frameHeight - waterHeight;
 
-  // Colour tracks the same scale as the map markers.
-  const fill =
-    severity === 0
-      ? "var(--color-safe)"
-      : severity <= 1
-        ? "#c9a227"
-        : severity <= 3
-          ? "#d97a1f"
-          : severity <= 6
-            ? "#c1401f"
-            : "#6b1414";
+  // Colour comes from the same table the map markers use, so a depth can
+  // never be one colour on the map and another in the card. HUMUPA_NA in
+  // particular shares severity 0 with WALANG_BAHA but must not share its
+  // green — deriving the colour from severity here would have quietly
+  // reintroduced that.
+  const fill = DEPTH_MAP_COLOR[code];
 
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden="true" focusable="false">
