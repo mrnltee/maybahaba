@@ -97,17 +97,77 @@ interface NominatimResult {
   display_name: string;
   class: string;
   type: string;
+  /**
+   * jsonv2's canonical "what kind of place is this". For an
+   * administrative boundary this holds "city" / "state" / "suburb",
+   * where `type` only says "administrative" — which is why classifying on
+   * `type` alone silently mislabelled every city in the country.
+   */
+  addresstype?: string;
+  /** Nominatim's granularity rank: lower = broader. City ~16, state ~8. */
+  place_rank?: number;
   address?: NominatimAddress;
   error?: string;
 }
 
-function classifyKind(type: string, cls: string): LocationResult["kind"] {
-  if (type === "road" || type === "street" || type === "highway") return "street";
-  if (type === "house" || cls === "building") return "address";
-  if (type === "suburb" || type === "neighbourhood" || type === "quarter") return "barangay";
-  if (type === "city" || type === "town" || type === "municipality") return "city";
-  if (type === "state" || type === "province" || type === "region") return "province";
+/**
+ * Maps a Nominatim result onto our own place taxonomy.
+ *
+ * The subtlety that caused a real bug: most Philippine cities, provinces
+ * and barangays are OSM *relations* tagged `class=boundary,
+ * type=administrative`. Classifying on `type` alone sent every one of
+ * them to "other", so `isAreaSearch()` said false and a search for
+ * "Quezon City" answered with a 300 m circle around the city centroid —
+ * reporting "walang recent na report" for a city that might have had
+ * reports two kilometres away. That is the exact false reassurance this
+ * product exists to avoid.
+ *
+ * `addresstype` is checked first because in jsonv2 it carries the actual
+ * administrative level. `place_rank` is the backstop for the case where
+ * `addresstype` is absent or unfamiliar.
+ */
+function classifyKind(raw: {
+  type: string;
+  class: string;
+  addresstype?: string;
+  place_rank?: number;
+}): LocationResult["kind"] {
+  const { type, class: cls, addresstype, place_rank } = raw;
+
+  // Whichever of the two fields is populated, the vocabulary is the same.
+  const level = addresstype ?? type;
+
+  if (level === "road" || level === "street" || level === "highway") return "street";
+  if (level === "house" || level === "house_number" || cls === "building") return "address";
+  if (
+    level === "suburb" ||
+    level === "neighbourhood" ||
+    level === "quarter" ||
+    level === "village" ||
+    level === "barangay"
+  ) {
+    return "barangay";
+  }
+  if (level === "city" || level === "town" || level === "municipality") return "city";
+  if (
+    level === "state" ||
+    level === "province" ||
+    level === "region" ||
+    level === "county"
+  ) {
+    return "province";
+  }
   if (cls === "tourism" || cls === "amenity" || cls === "shop") return "landmark";
+
+  // Still an administrative boundary but an unfamiliar label — fall back
+  // on Nominatim's own granularity rank rather than giving up and
+  // returning "other", which would suppress the area search.
+  if (cls === "boundary" && typeof place_rank === "number") {
+    if (place_rank <= 12) return "province";
+    if (place_rank <= 17) return "city";
+    return "barangay";
+  }
+
   return "other";
 }
 
@@ -126,7 +186,7 @@ function toLocationResult(raw: NominatimResult): LocationResult {
     barangay,
     city,
     province,
-    kind: classifyKind(raw.type, raw.class),
+    kind: classifyKind(raw),
     boundingBox: raw.boundingbox
       ? {
           minLat: parseFloat(raw.boundingbox[0]),
@@ -168,3 +228,10 @@ function byMetroManilaRelevance(a: LocationResult, b: LocationResult): number {
   };
   return score(b) - score(a);
 }
+
+/**
+ * Exported for tests only. The classifier caused a production bug that
+ * misreported a whole city as having no flood reports, so it is worth
+ * pinning directly rather than only through the provider's fetch path.
+ */
+export const classifyKindForTest = classifyKind;

@@ -342,13 +342,43 @@ export interface AreaBounds {
 /** Administrative kinds worth answering with an area summary rather than one card. */
 export const AREA_KINDS = ["barangay", "city", "province"] as const;
 
+/**
+ * Roughly 2 km, expressed in degrees. Anything whose bounding box spans
+ * more than this in either axis is treated as an area even if we failed
+ * to classify it, because the two ways of being wrong are not equally
+ * bad:
+ *
+ *   - Wrongly treating a point as an area shows the user MORE reports
+ *     than strictly asked for. Harmless.
+ *   - Wrongly treating an area as a point answers a city-wide question
+ *     with a 300 m circle, and reports "walang recent na report" for a
+ *     city that may be flooding a kilometre away. That is the failure
+ *     this product cannot have.
+ *
+ * So the tie-breaker deliberately favours the area search.
+ */
+const AREA_SPAN_DEGREES = 0.02;
+
+export function boundingBoxSpanDegrees(box: AreaBounds): { lat: number; lon: number } {
+  return {
+    lat: Math.abs(box.maxLat - box.minLat),
+    lon: Math.abs(box.maxLon - box.minLon),
+  };
+}
+
 export function isAreaSearch(location: {
   kind: LocationResult["kind"];
   boundingBox?: AreaBounds | null;
 }): boolean {
-  return Boolean(
-    location.boundingBox && (AREA_KINDS as readonly string[]).includes(location.kind)
-  );
+  const box = location.boundingBox;
+  if (!box) return false;
+  if ((AREA_KINDS as readonly string[]).includes(location.kind)) return true;
+
+  // Safety net for anything the geocoder labelled in a way we did not
+  // recognise: judge it by the size of the box, which is a physical fact
+  // rather than a naming convention.
+  const span = boundingBoxSpanDegrees(box);
+  return span.lat > AREA_SPAN_DEGREES || span.lon > AREA_SPAN_DEGREES;
 }
 
 /** Aggregate answer for a whole area — never a single condition claim. */
