@@ -5,8 +5,10 @@ import { AccuracyControls } from "@/components/ValidationControls";
 import { DEPTH_MAP_COLOR, DISPUTED_MAP_COLOR, MAP_LEGEND, isDisputed } from "@/lib/mapColors";
 import { formatRelativeTime } from "@/lib/time";
 import { getFloodDepthOption, type FloodReport } from "@/lib/types";
+import { OPEN_WEATHER_RAINFALL } from "@/lib/weatherLayers";
 import type L from "leaflet";
-import { useEffect, useRef } from "react";
+import { CloudRain } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 interface MapViewProps {
@@ -52,6 +54,12 @@ export function MapView({
   onReportHere,
   radiusMeters = null,
 }: MapViewProps) {
+  /**
+   * Off by default. Someone opening this map wants to know whether a road
+   * is flooded; a blue wash over everything is not the first thing they
+   * asked for (spec: rainfall is supporting context).
+   */
+  const [showRainfall, setShowRainfall] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -61,6 +69,15 @@ export function MapView({
   const onReportHereRef = useRef(onReportHere);
   /** Transient "you tapped here" pin, replaced on each new tap. */
   const tapMarkerRef = useRef<L.Marker | null>(null);
+  /**
+   * The rainfall overlay, held separately from the base layer so it can
+   * be added and removed without touching the map's view. Nothing in
+   * this ref's lifecycle calls setView, fitBounds or panTo — the spec is
+   * explicit that enabling weather must never re-centre the map, and the
+   * way to guarantee that is for the layer code to have no access to the
+   * view at all.
+   */
+  const rainLayerRef = useRef<L.TileLayer | null>(null);
 
   useEffect(() => {
     onReportUpdatedRef.current = onReportUpdated;
@@ -88,6 +105,25 @@ export function MapView({
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
           maxZoom: 19,
         }).addTo(mapRef.current);
+
+        // The rainfall overlay is constructed but NOT added — the toggle
+        // decides that. Building it here means flipping the toggle costs
+        // no setup work and, more importantly, that its creation is not
+        // entangled with the map's initial view.
+        rainLayerRef.current = L.tileLayer(OPEN_WEATHER_RAINFALL.tileUrlTemplate, {
+          attribution: OPEN_WEATHER_RAINFALL.attribution,
+          opacity: OPEN_WEATHER_RAINFALL.opacity,
+          // Past this zoom OpenWeather has no more detail; Leaflet
+          // upscales the last real tile instead of requesting tiles that
+          // would come back blank.
+          maxNativeZoom: OPEN_WEATHER_RAINFALL.maxNativeZoom,
+          maxZoom: 19,
+          // Stays in the tile pane, below the marker pane. Report pins
+          // therefore render above the rain, and because tile layers are
+          // non-interactive the overlay cannot swallow a marker tap.
+          pane: "tilePane",
+          className: "maybahaba-rain-layer",
+        });
 
         // Tap empty map space to file a report at that exact spot. Bound
         // once, on map creation, so re-renders don't stack handlers.
@@ -254,6 +290,25 @@ export function MapView({
     };
   }, []);
 
+  /**
+   * Add or remove the overlay when the toggle changes.
+   *
+   * Its own effect, depending only on `showRainfall`. Keeping it apart
+   * from the map-creation effect is what stops a weather toggle from
+   * re-running anything to do with centring, and means a slow or failing
+   * tile provider cannot delay the base map or the report pins.
+   */
+  useEffect(() => {
+    const map = mapRef.current;
+    const layer = rainLayerRef.current;
+    if (!map || !layer) return;
+    if (showRainfall) {
+      if (!map.hasLayer(layer)) layer.addTo(map);
+    } else if (map.hasLayer(layer)) {
+      map.removeLayer(layer);
+    }
+  }, [showRainfall]);
+
   return (
     <div>
       <div
@@ -267,7 +322,52 @@ export function MapView({
           I-tap ang mapa para mag-report ng baha sa eksaktong lugar na iyon.
         </p>
       )}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium text-(--color-ink)">
+          <input
+            type="checkbox"
+            checked={showRainfall}
+            onChange={(e) => setShowRainfall(e.target.checked)}
+            className="h-4 w-4 accent-(--color-brand)"
+          />
+          <CloudRain className="h-4 w-4 text-(--color-ink-muted)" aria-hidden="true" />
+          {OPEN_WEATHER_RAINFALL.name}
+        </label>
+      </div>
+
+      {showRainfall && (
+        <div className="mt-2 rounded-xl border border-(--color-border) bg-(--color-paper) p-3">
+          <p className="text-xs font-semibold text-(--color-ink)">
+            Lakas ng ulan{" "}
+            <span className="font-normal text-(--color-ink-muted)">
+              — hindi ito lalim ng baha
+            </span>
+          </p>
+          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-(--color-ink-muted)">
+            {OPEN_WEATHER_RAINFALL.legend.map((band) => (
+              <li key={band.label} className="flex items-center gap-1.5">
+                <span
+                  className="inline-block h-2.5 w-4 rounded-sm"
+                  style={{ backgroundColor: band.colour }}
+                  aria-hidden="true"
+                />
+                {band.label} <span className="text-(--color-ink-faint)">{band.range}</span>
+              </li>
+            ))}
+          </ul>
+          {/* The same boundary RainfallPanel draws, restated here because
+              a user who enabled this layer may never have scrolled to
+              that panel. Rain in the sky is not water on the road. */}
+          <p className="mt-2 text-xs text-(--color-ink-muted)">
+            Tantiyang lakas ng ulan mula sa weather model —{" "}
+            <strong className="font-semibold">hindi ito babala ng baha</strong>. Ang mga pin ang
+            nagsasabi ng kondisyon sa kalsada.
+          </p>
+        </div>
+      )}
+
       <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-(--color-ink-muted)">
+        <li className="w-full text-xs font-semibold text-(--color-ink)">Kondisyon sa kalsada</li>
         {MAP_LEGEND.map((item) => (
           <li key={item.label} className="flex items-center gap-1.5">
             <span

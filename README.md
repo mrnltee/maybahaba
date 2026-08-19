@@ -47,6 +47,7 @@ src/
       admin/session/route.ts     GET — is the caller a signed-in moderator? (boolean only)
       admin/reports/route.ts     GET — every report as JSON, or `?format=csv` to download
       rainfall/route.ts          GET — current rainfall near a point (Open-Meteo)
+      weather-tiles/[...]/route.ts  GET — proxied rainfall map tiles (keeps the key server-side)
       reports/[id]/validate/     POST — validate/deny/flag (admin only)
       admin/login, admin/logout  Passcode session cookie
   components/                    UI components (search box, modal, map, cards)
@@ -211,6 +212,7 @@ See `.env.example` for the full list with inline explanations. Summary:
 | `SUPABASE_SERVICE_ROLE_KEY` | Only for real moderation actions | No |
 | `ABUSE_HASH_SALT` | Recommended in production | No |
 | `ADMIN_PASSCODE` | Required to use `/admin/validate` and `/admin/reports` | No |
+| `OPENWEATHER_API_KEY` | No — without it the rainfall overlay draws nothing | No (60 calls/min free) |
 | `NEXT_PUBLIC_MAP_PROVIDER` | No (informational; only `osm` is implemented) | No |
 
 Never commit `.env.local`. It's already covered by `.gitignore`.
@@ -294,6 +296,81 @@ Two implementation details that carry safety weight:
 carries advertising or a subscription, this integration needs a paid
 Open-Meteo plan or a different source. The CC BY 4.0 attribution in the
 panel is a licence condition, not a courtesy — do not remove it.
+
+---
+
+## Rainfall map overlay
+
+An optional tile layer over the OpenStreetMap base map, **off by
+default**. Toggle it from the control under the map.
+
+### Why OpenWeather, and why RainViewer was rejected
+
+RainViewer looked like the obvious pick — free, no API key, purpose-built
+radar. It was ruled out on two findings:
+
+- Its personal-use tier **caps at zoom level 7**. This map operates at
+  zoom 12-16, so the overlay would be an unusable blur at exactly the
+  zooms motorists use.
+- Its radar is stitched from national networks and there is no
+  confirmation PAGASA's radar is among them, so coverage over Metro
+  Manila would have been a guess.
+
+OpenWeather's `precipitation_new` has documented worldwide coverage and
+works at street zooms.
+
+### Tiles are proxied, deliberately
+
+`/api/weather-tiles/rainfall/{z}/{x}/{y}` fetches from OpenWeather
+server-side. Two reasons:
+
+1. **The key would otherwise be public.** OpenWeather takes it as a URL
+   query parameter, so pointing Leaflet straight at them publishes it in
+   every visitor's network tab. `OPENWEATHER_API_KEY` is a Worker secret,
+   never a `NEXT_PUBLIC_` value. A test asserts the client-facing tile
+   template contains no key parameter and does not point at
+   openweathermap.org.
+2. **The free tier is 60 calls/minute.** One viewport is about a dozen
+   tiles, so three simultaneous users would exhaust it. Proxying lets
+   Cloudflare cache each tile at the edge for 10 minutes; Metro Manila at
+   these zooms is a bounded tile set, so after the first viewer most
+   requests never reach OpenWeather.
+
+### Failure is silent, and the map keeps working
+
+A missing key, a bad key, a quota exhaustion or an outage all return a
+**transparent 1×1 PNG with status 200**, tagged with an `X-Weather-Tile`
+header saying why. Returning an error status instead would make Leaflet
+draw a broken-image icon in every tile slot — a map peppered with grey
+squares looks far more alarming than one with no rain shown. The base
+map, the report pins and every interaction keep working.
+
+### It is context, never a flood claim
+
+The layer says how hard it is raining. The pins say what is happening on
+the road. These are not the same thing and the UI must never merge them:
+
+- The legend is headed "Lakas ng ulan — **hindi ito lalim ng baha**" and
+  states "**hindi ito babala ng baha**".
+- Its palette is blues only. Tests assert no band label contains a
+  PAGASA warning colour (dilaw/kahel/pula) or any road/flood word.
+- Opacity is 50% so street names stay readable underneath.
+- Report markers sit in Leaflet's `markerPane` (z-index 600) above the
+  overlay's `tilePane` (200), and tile layers are non-interactive, so the
+  overlay can never swallow a marker tap.
+
+Enabling the layer runs in its own effect that has no access to the map
+view — it cannot re-centre the map, which is what the result-card
+centring behaviour depends on.
+
+### Adding PAGASA later
+
+`lib/weatherLayers.ts` holds a registry; the map, toggle and legend all
+read from it. A PAGASA rainfall-warning layer is a new entry, not a
+rewrite. Keep it a **separate** entry rather than merging: an official
+warning is a different kind of claim from modelled rainfall, and it is
+the one thing entitled to the yellow/orange/red scale this layer must
+never borrow.
 
 ---
 

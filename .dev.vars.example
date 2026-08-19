@@ -18,3 +18,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ADMIN_PASSCODE=
 ABUSE_HASH_SALT=
+
+# Optional. Enables the rainfall overlay on the map. Without it the
+# overlay toggle still appears but draws nothing — the map, the reports
+# and everything else work unchanged.
+#
+# This is a SERVER-side secret, not a NEXT_PUBLIC_ value: tiles are
+# proxied through /api/weather-tiles so the key never reaches a browser.
+# Get one free at https://openweathermap.org/api (60 calls/min).
+OPENWEATHER_API_KEY=
