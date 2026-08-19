@@ -146,7 +146,7 @@ export function MapView({
           const pin = L.divIcon({
             className: "",
             html: `<div style="width:26px;height:26px;transform:translateY(-4px)">
-              <svg viewBox="0 0 24 24" width="26" height="26" fill="#0f5c73" stroke="white" stroke-width="1"><path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="#1E3A8A" stroke="white" stroke-width="1"><path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
             </div>`,
             iconSize: [26, 26],
             iconAnchor: [13, 26],
@@ -160,7 +160,7 @@ export function MapView({
           btn.type = "button";
           btn.textContent = "Mag-report ng baha dito";
           btn.style.cssText =
-            "background:#0f5c73;color:#fff;border:none;border-radius:9999px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit";
+            "background:#1E3A8A;color:#fff;border:none;border-radius:9999px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit";
           btn.onclick = () => {
             marker.closePopup();
             handler(e.latlng.lat, e.latlng.lng);
@@ -185,10 +185,10 @@ export function MapView({
       if (radiusMeters && radiusMeters > 0) {
         radiusCircleRef.current = L.circle([center.latitude, center.longitude], {
           radius: radiusMeters,
-          color: "#0f5c73",
+          color: "#1E3A8A",
           weight: 1.5,
           opacity: 0.7,
-          fillColor: "#0f5c73",
+          fillColor: "#1E3A8A",
           fillOpacity: 0.07,
           interactive: false,
         }).addTo(mapRef.current);
@@ -199,7 +199,7 @@ export function MapView({
       // Center marker (the searched location).
       const centerIcon = L.divIcon({
         className: "",
-        html: `<div style="width:14px;height:14px;border-radius:9999px;background:#0f5c73;border:2px solid white;box-shadow:0 0 0 2px #0f5c73;"></div>`,
+        html: `<div style="width:14px;height:14px;border-radius:9999px;background:#1E3A8A;border:2px solid white;box-shadow:0 0 0 2px #1E3A8A;"></div>`,
         iconSize: [14, 14],
         iconAnchor: [7, 7],
       });

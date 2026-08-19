@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, ExternalLink, ShieldCheck } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -55,8 +56,26 @@ export function Header({ onReportClick }: { onReportClick: () => void }) {
   return (
     <header className="sticky top-0 z-30 border-b border-(--color-border) bg-(--color-paper)/95">
       <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3 sm:px-6">
-        <Link href="/" className="text-lg font-bold tracking-tight text-(--color-ink)">
-          MayBaha<span className="text-(--color-brand)">Ba</span>
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-lg font-bold tracking-tight text-(--color-ink)"
+        >
+          {/* The mark is decorative here — the wordmark beside it already
+              names the app, so announcing both would just repeat it. */}
+          <Image
+            src="/logo-mark.svg"
+            alt=""
+            width={32}
+            height={32}
+            priority
+            className="h-8 w-8 shrink-0"
+            aria-hidden="true"
+          />
+          {/* One flex child, not two text nodes: the container's gap-2 was
+              landing between "MayBaha" and "Ba" and splitting the wordmark. */}
+          <span>
+            MayBaha<span className="text-(--color-brand)">Ba</span>
+          </span>
         </Link>
 
         <div ref={containerRef} className="relative flex items-center">

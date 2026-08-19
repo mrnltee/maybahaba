@@ -22,9 +22,15 @@
   --color-surface: #ffffff;
 
   /* Brand: overcast-sky blue. Community-run public utility, not corporate. */
-  --color-brand: #0f5c73;
+  /* Brand navy. #1E3A8A, not the brighter #3B82F6 from the palette:
+     the bright blue is 3.68:1 on white, which fails WCAG AA for text
+     (4.5:1) and for white-on-brand buttons. Navy is 10.36:1. */
+  --color-brand: #1E3A8A;
   --color-brand-ink: #ffffff;
-  --color-brand-hover: #0c4a5d;
+  --color-brand-hover: #16306e;
+  /* Bright blue is an ACCENT only — logo water, decorative fills.
+     Never text, never a button background with text on it. */
+  --color-brand-accent: #3B82F6;
 
   /* Status colors — always paired with text/icon, never used alone. */
   --color-safe: #1a7a4c;
