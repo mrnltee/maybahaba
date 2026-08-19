@@ -46,6 +46,7 @@ src/
       reports/pending/route.ts   GET — moderation queue (admin only)
       admin/session/route.ts     GET — is the caller a signed-in moderator? (boolean only)
       admin/reports/route.ts     GET — every report as JSON, or `?format=csv` to download
+      rainfall/route.ts          GET — current rainfall near a point (Open-Meteo)
       reports/[id]/validate/     POST — validate/deny/flag (admin only)
       admin/login, admin/logout  Passcode session cookie
   components/                    UI components (search box, modal, map, cards)
@@ -249,6 +250,50 @@ open it natively. Two details that matter:
   quote. Reporter names are attacker-controlled and anonymous, and Excel
   executes such values as formulas — see `csvCell()` in
   `api/admin/reports/route.ts`.
+
+---
+
+## Rainfall — what it is, and the three things it is not
+
+The homepage shows current rainfall beneath the flood reports, sourced
+from [Open-Meteo](https://open-meteo.com/) (no API key, CC BY 4.0,
+10,000 calls/day on the free non-commercial tier).
+
+This is the single easiest place in the product to break the founding
+rule, so the constraints are encoded in `lib/rainfall.ts` and enforced by
+tests in `lib/__tests__/rainfall.test.ts`:
+
+1. **It is not a flood prediction.** Heavy rain does not mean the road
+   ahead is flooded, and zero rain does not mean it is clear — Metro
+   Manila floods from river swell, high tide, dam releases and blocked
+   drainage hours after rain stops. A test asserts that no band label or
+   description contains the words *baha*, *kalsada*, *daan*, *flood*,
+   *road*, or *ligtas*.
+2. **It is not a PAGASA advisory.** Only PAGASA can issue a Heavy
+   Rainfall Warning, and only PAGASA's yellow/orange/red mean anything.
+   The panel deliberately uses no colour from the flood palette, and a
+   test asserts that no copy contains a warning-colour word. We link to
+   [PAGASA's NCR forecast](https://www.pagasa.dost.gov.ph/regional-forecast/ncrprsd)
+   for the authoritative warning.
+3. **It is not a measurement.** Open-Meteo returns global weather-model
+   output, not a gauge reading on that street. The UI says *tantiya*
+   (estimate) for exactly this reason.
+
+Two implementation details that carry safety weight:
+
+- **A failure shows nothing, never a zero.** If the upstream is down,
+  malformed, or missing a usable number, `fetchRainfall` throws and the
+  panel renders "walang datos". Displaying "walang ulan" because an API
+  timed out would be asserting something we do not know.
+- **Coordinates are rounded to 2 decimal places (~1.1 km)** before
+  leaving our server. This keeps the cache hit-rate high enough to stay
+  inside the free tier from a globally distributed Worker, and means a
+  user's precise location is never handed to a third party.
+
+**Licence note:** the free tier is non-commercial only. If MayBahaBa ever
+carries advertising or a subscription, this integration needs a paid
+Open-Meteo plan or a different source. The CC BY 4.0 attribution in the
+panel is a licence condition, not a courtesy — do not remove it.
 
 ---
 

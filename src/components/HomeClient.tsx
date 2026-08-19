@@ -4,6 +4,7 @@ import { Header } from "@/components/Header";
 import { MapViewLoader } from "@/components/MapViewLoader";
 import { ReportBahaModal } from "@/components/ReportBahaModal";
 import { AreaResultCard } from "@/components/AreaResultCard";
+import { RainfallPanel } from "@/components/RainfallPanel";
 import { ResultCard } from "@/components/ResultCard";
 import { ResultSkeleton } from "@/components/Skeleton";
 import { SearchBox } from "@/components/SearchBox";
@@ -220,6 +221,16 @@ export function HomeClient({ isUsingMockData }: { isUsingMockData: boolean }) {
                 </div>
               )}
             </>
+          )}
+
+          {/* Below the reports, deliberately. Rainfall is context; the
+              community's reports are the answer. See RainfallPanel. */}
+          {!loading && !error && selectedLocation && (result || areaResult) && (
+            <RainfallPanel
+              latitude={selectedLocation.latitude}
+              longitude={selectedLocation.longitude}
+              areaLabel={selectedLocation.label}
+            />
           )}
 
           {!loading && !error && !result && !areaResult && (
