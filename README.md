@@ -336,6 +336,31 @@ server-side. Two reasons:
    these zooms is a bounded tile set, so after the first viewer most
    requests never reach OpenWeather.
 
+### If the overlay looks empty
+
+Three different things produce a blank overlay, and the tile proxy renders
+all of them as a transparent tile, so from the map alone they are
+indistinguishable. Check in this order:
+
+```bash
+curl -s https://<your-worker>/api/weather-tiles/status
+# {"configured":false}  -> OPENWEATHER_API_KEY is not set
+# {"configured":true}   -> key is set; check the tile header below
+
+curl -sD - -o /dev/null \
+  https://<your-worker>/api/weather-tiles/rainfall/12/3345/2020 | grep -i x-weather-tile
+# not-configured   no key
+# upstream-401     key rejected
+# upstream-429     free-tier quota spent
+# fetch-failed     provider unreachable or timed out
+# (header absent)  a real tile came back - the overlay is working
+```
+
+If the header is absent and the map still looks clear, **it simply is not
+raining in that view**. `precipitation_new` renders near-transparent at low
+intensity, so a working overlay over dry ground looks like no overlay at
+all. The UI says as much under the legend rather than leaving you to guess.
+
 ### Failure is silent, and the map keeps working
 
 A missing key, a bad key, a quota exhaustion or an outage all return a

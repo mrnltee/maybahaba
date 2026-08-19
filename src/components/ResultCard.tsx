@@ -7,13 +7,16 @@ import { FollowUpFlow } from "@/components/FollowUpFlow";
 import { AccuracyControls, CommunitySignals } from "@/components/ValidationControls";
 import { ExternalMapLinks } from "@/components/ExternalMapLinks";
 import { conciseLocationLabel, wasShortened } from "@/lib/formatLocation";
+import { getPageableReports, shouldShowPager, wrapIndex } from "@/lib/nearbyPager";
+import { deriveStatus } from "@/lib/status";
 import { formatRadius } from "@/lib/config/freshness";
-import { formatDistance } from "@/lib/geo";
+import { formatDistanceFrom } from "@/lib/geo";
 import { getFloodDepthOption } from "@/lib/types";
 import { formatPhTime, formatRelativeTime } from "@/lib/time";
 import { STATUS_COPY } from "@/lib/status";
 import type { FloodReport, NearbySearchResult } from "@/lib/types";
-import { MapPinned } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPinned } from "lucide-react";
+import { useState } from "react";
 
 /**
  * The single screen this product lives or dies on.
@@ -48,10 +51,54 @@ export function ResultCard({
   /** Distance from the user, when they've shared their location. */
   distanceFromDevice?: number | null;
 }) {
-  const { topReport, status, confidence, nearbyReports } = result;
+  const { confidence, nearbyReports } = result;
+
+  /**
+   * Every current report in range, worst first. The card used to show
+   * only the worst one plus a dead line of text saying how many others
+   * existed — visible but unreachable. Now it pages.
+   */
+  const pageable = getPageableReports(nearbyReports, result.center);
+  const showPager = shouldShowPager(pageable);
+
+  const [index, setIndex] = useState(0);
+
+  /**
+   * Reset to the worst report when the search changes, without an
+   * effect: store the list's identity alongside the index and compare
+   * during render. A stale index after a new search would silently show
+   * the wrong flood.
+   */
+  const listKey = pageable.map((p) => p.report.id).join("|");
+  const [seenKey, setSeenKey] = useState(listKey);
+  if (seenKey !== listKey) {
+    setSeenKey(listKey);
+    setIndex(0);
+  }
+
+  const safeIndex = wrapIndex(index, pageable.length);
+  const current = pageable[safeIndex] ?? null;
+
+  /**
+   * The report the card is describing. Falls back to the server's
+   * topReport when nothing is pageable — e.g. every nearby report is
+   * stale, in which case the server's answer still explains why.
+   */
+  const topReport = current?.report ?? result.topReport;
+
+  /**
+   * Derived locally rather than taken from `result.status`, because that
+   * describes the server's top report and the user may have paged past
+   * it. Deriving keeps the badge, the headline and the prose describing
+   * the same report the follow-up buttons will act on.
+   */
+  const status = current ? deriveStatus(current.report) : result.status;
+
+  /** Distance to show while paging; null when there is nothing to page. */
+  const pagedDistanceMeters = showPager ? (current?.distanceMeters ?? null) : null;
   const copy = STATUS_COPY[status];
   const depth = topReport ? getFloodDepthOption(topReport.floodDepth) : null;
-  const otherReportsCount = Math.max(0, nearbyReports.length - (topReport ? 1 : 0));
+  const otherReportsCount = Math.max(0, pageable.length - 1);
 
   // Prefer the report's own structured address fields; fall back to the
   // searched location's raw label when there is no report yet.
@@ -89,11 +136,22 @@ export function ResultCard({
           <MapPinned className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span title={wasShortened(displayLabel, locationLabel) ? locationLabel : undefined}>
             {displayLabel}
-            {distanceFromDevice !== null && (
+            {/* While paging, the useful distance is how far this report is
+                from the place they searched — that is what tells them
+                whether it is on their route. With a single report, how far
+                it is from the user is the more useful number. */}
+            {pagedDistanceMeters !== null ? (
               <span className="text-(--color-ink-faint)">
                 {" · "}
-                {formatDistance(distanceFromDevice)} mula sa iyo
+                {formatDistanceFrom(pagedDistanceMeters, "hinanap")}
               </span>
+            ) : (
+              distanceFromDevice !== null && (
+                <span className="text-(--color-ink-faint)">
+                  {" · "}
+                  {formatDistanceFrom(distanceFromDevice, "iyo")}
+                </span>
+              )
             )}
           </span>
         </p>
@@ -148,6 +206,45 @@ export function ResultCard({
             </span>
           )}
         </div>
+      )}
+
+      {showPager && (
+        <nav
+          aria-label="Iba pang report sa lugar na ito"
+          className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-(--color-border) bg-(--color-paper) p-2"
+        >
+          <button
+            type="button"
+            onClick={() => setIndex(wrapIndex(safeIndex - 1, pageable.length))}
+            className="inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold text-(--color-ink) hover:bg-(--color-surface) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            Nauna
+          </button>
+
+          {/*
+            aria-live so a screen reader hears the position change. The
+            surrounding section is already aria-live="polite", but this
+            counter is the only thing that tells a non-visual user the tap
+            did anything at all.
+          */}
+          <p aria-live="polite" className="text-xs font-medium text-(--color-ink-muted)">
+            Report {safeIndex + 1} sa {pageable.length}
+            <span className="sr-only">
+              {" "}
+              — {getFloodDepthOption(topReport!.floodDepth).label}
+            </span>
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setIndex(wrapIndex(safeIndex + 1, pageable.length))}
+            className="inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold text-(--color-ink) hover:bg-(--color-surface) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
+          >
+            Susunod
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </nav>
       )}
 
       {topReport && <CommunitySignals report={topReport} />}

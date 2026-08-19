@@ -60,6 +60,16 @@ export function MapView({
    * asked for (spec: rainfall is supporting context).
    */
   const [showRainfall, setShowRainfall] = useState(false);
+  /**
+   * null = not asked yet. Only asked once the user turns the layer on,
+   * so a visitor who never touches it costs no request.
+   *
+   * Needed because a blank overlay has three very different causes — no
+   * key configured, a key the provider rejected, or simply no rain in
+   * view — and the tile proxy deliberately renders all three as
+   * transparent tiles. Without this the empty map is unexplainable.
+   */
+  const [rainConfigured, setRainConfigured] = useState<boolean | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersRef = useRef<L.Marker[]>([]);
@@ -299,6 +309,22 @@ export function MapView({
    * tile provider cannot delay the base map or the report pins.
    */
   useEffect(() => {
+    if (!showRainfall || rainConfigured !== null) return;
+    let cancelled = false;
+    fetch("/api/weather-tiles/status")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setRainConfigured(Boolean(d.configured));
+      })
+      .catch(() => {
+        if (!cancelled) setRainConfigured(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showRainfall, rainConfigured]);
+
+  useEffect(() => {
     const map = mapRef.current;
     const layer = rainLayerRef.current;
     if (!map || !layer) return;
@@ -363,6 +389,27 @@ export function MapView({
             <strong className="font-semibold">hindi ito babala ng baha</strong>. Ang mga pin ang
             nagsasabi ng kondisyon sa kalsada.
           </p>
+
+          {/*
+            Why the overlay might look empty. Without this the three
+            causes are indistinguishable, which is exactly the confusion
+            the silent tile fallback creates.
+          */}
+          {rainConfigured === false ? (
+            <p
+              role="status"
+              className="mt-2 border-t border-(--color-border) pt-2 text-xs text-(--color-warn)"
+            >
+              Hindi pa available ang rainfall layer — wala pang naka-configure na weather data
+              source. Gumagana pa rin ang mapa at ang mga report.
+            </p>
+          ) : (
+            rainConfigured === true && (
+              <p className="mt-2 border-t border-(--color-border) pt-2 text-xs text-(--color-ink-faint)">
+                Kung walang kulay sa mapa, walang naitalang ulan sa bahaging ito ngayon.
+              </p>
+            )
+          )}
         </div>
       )}
 

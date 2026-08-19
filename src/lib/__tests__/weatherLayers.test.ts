@@ -76,3 +76,24 @@ describe("visual semantics", () => {
     }
   });
 });
+
+/**
+ * The overlay's blank state has three causes — no key, a rejected key,
+ * and no rain in view — and the tile proxy renders all three as a
+ * transparent tile so that a provider outage cannot fill the map with
+ * broken-image icons. That is right for users but made the feature
+ * undiagnosable: "not displaying" was indistinguishable from "working,
+ * nothing to draw". These pin the pieces that let the UI tell them apart.
+ */
+describe("diagnosability of a blank overlay", () => {
+  it("the layer declares a maxNativeZoom, so blank tiles are not requested past it", () => {
+    // Requesting zoom-16 tiles the provider has no data for would look
+    // identical to an outage.
+    expect(OPEN_WEATHER_RAINFALL.maxNativeZoom).toBeGreaterThan(0);
+    expect(OPEN_WEATHER_RAINFALL.maxNativeZoom).toBeLessThanOrEqual(16);
+  });
+
+  it("the legend describes intensity bands, so an empty map is readable as 'no rain'", () => {
+    expect(OPEN_WEATHER_RAINFALL.legend.length).toBeGreaterThanOrEqual(2);
+  });
+});
