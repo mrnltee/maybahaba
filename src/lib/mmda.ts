@@ -1,5 +1,5 @@
 import { getWaterlineCm } from "./floodScale";
-import type { FloodDepthCode } from "./types";
+import type { FloodDepthCode, RoadConditionCode, VehicleTypeCode } from "./types";
 
 /**
  * MMDA's official flood-gauge passability bands, mapped onto MayBahaBa's
@@ -106,4 +106,53 @@ export function isNoVehiclePassable(code: FloodDepthCode): boolean {
 export function shouldAskVehicleTypes(code: FloodDepthCode | null): boolean {
   if (!code) return false;
   return getMmdaAssessment(code)?.band === "NPLV";
+}
+
+/**
+ * Road condition, derived from the depth rather than asked separately.
+ *
+ * The report form used to carry a "hindi madaanan ang kalsada" tickbox
+ * alongside the depth picker. Once the MMDA band is computed from depth,
+ * that tickbox becomes a SECOND source of truth about the same fact — and
+ * the two can disagree. A reporter could tick "hindi madaanan" at
+ * gutter-deep, or leave it blank at waist-deep, and the record would then
+ * contain a passability claim that contradicts the one the app displays.
+ *
+ * Deriving it keeps the moderator table and the CSV export populated for
+ * new reports without asking a question the depth already answers.
+ * Existing rows keep whatever finer-grained value they were filed with.
+ */
+export function getDerivedRoadCondition(
+  code: FloodDepthCode | null
+): RoadConditionCode | null {
+  if (!code) return null;
+  const band = getMmdaAssessment(code)?.band;
+  if (!band) return code === "WALANG_BAHA" ? "PASSABLE" : null;
+  if (band === "NPATV") return "NOT_PASSABLE";
+  if (band === "NPLV") return "DIFFICULT";
+  return "PASSABLE";
+}
+
+/**
+ * The vehicles a depth affects, used to pre-fill the report form.
+ *
+ *  PATV   nothing is stopped, so nothing is affected.
+ *  NPLV   the light vehicles are — motorcycles and sedans. That IS what
+ *         "not passable to light vehicles" names, so it is a defensible
+ *         default rather than a guess. The reporter can still untick
+ *         either, because a specific street may behave differently.
+ *  NPATV  every type, by definition of the band. Nothing to ask.
+ *
+ * Returning a default is what lets the form stop asking at NPATV without
+ * losing the data: the answer is entailed by the depth, so recording it
+ * is honest rather than invented.
+ */
+export function getDefaultVehicleTypes(code: FloodDepthCode | null): VehicleTypeCode[] {
+  if (!code) return [];
+  const band = getMmdaAssessment(code)?.band;
+  if (band === "NPATV") {
+    return ["MOTORCYCLE", "SEDAN", "SUV", "TRUCK", "JEEPNEY", "OTHER"];
+  }
+  if (band === "NPLV") return ["MOTORCYCLE", "SEDAN"];
+  return [];
 }

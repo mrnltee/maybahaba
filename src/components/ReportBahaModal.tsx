@@ -2,7 +2,11 @@
 
 import { FloodDepthPicker } from "@/components/FloodDepthPicker";
 import { LocationPickerMapLoader } from "@/components/LocationPickerMapLoader";
-import { shouldAskVehicleTypes } from "@/lib/mmda";
+import {
+  getDefaultVehicleTypes,
+  getDerivedRoadCondition,
+  shouldAskVehicleTypes,
+} from "@/lib/mmda";
 import { Modal } from "@/components/Modal";
 import { SearchBox } from "@/components/SearchBox";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -14,7 +18,6 @@ import {
   type FloodDepthCode,
   type FloodReport,
   type LocationResult,
-  type RoadConditionCode,
   type VehicleTypeCode,
 } from "@/lib/types";
 import { getFloodDepthOption } from "@/lib/types";
@@ -73,7 +76,6 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
 
   const [reportedAtLocal, setReportedAtLocal] = useState(() => utcIsoToPhLocalInput(new Date().toISOString()));
   const [floodDepth, setFloodDepth] = useState<FloodDepthCode | null>(null);
-  const [roadCondition, setRoadCondition] = useState<RoadConditionCode | "">("");
   const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeCode[]>([]);
   const [reporterName, setReporterName] = useState("");
   const [anonymous, setAnonymous] = useState(true);
@@ -98,7 +100,12 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
    */
   function handleDepthChange(code: FloodDepthCode) {
     setFloodDepth(code);
-    if (!shouldAskVehicleTypes(code)) setVehicleTypes([]);
+    // Seed from the band rather than carrying the previous depth's answer
+    // across. At NPLV this pre-ticks the light vehicles the reporter can
+    // then adjust; at NPATV it records every type, which is what the band
+    // means; elsewhere it clears. Either way the vehicles on file always
+    // correspond to the depth actually chosen.
+    setVehicleTypes(getDefaultVehicleTypes(code));
   }
 
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
@@ -109,7 +116,6 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
     setLocationError(null);
     setReportedAtLocal(utcIsoToPhLocalInput(new Date().toISOString()));
     setFloodDepth(null);
-    setRoadCondition("");
     setVehicleTypes([]);
     setReporterName("");
     setAnonymous(true);
@@ -230,7 +236,8 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
           city: location.city,
           province: location.province,
           floodDepth,
-          roadCondition: roadCondition || null,
+          // Derived from depth, never asked — see getDerivedRoadCondition.
+          roadCondition: getDerivedRoadCondition(floodDepth),
           vehicleTypes,
           reportedAt: phLocalInputToUtcIso(reportedAtLocal),
           reporterName: anonymous ? null : reporterName.trim() || null,
@@ -399,30 +406,6 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
             {showOptional && (
               <div className="mt-3 space-y-5">
                 {/*
-                  A single tick rather than a four-option scale. Reporters
-                  could not reliably separate "with caution" from
-                  "difficult", and a binary they answer honestly is worth
-                  more than a gradient they guess at. Older reports keep
-                  their finer-grained values (see ROAD_CONDITION_LABELS).
-                */}
-                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-3 py-2.5 has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-(--color-brand)">
-                  <input
-                    type="checkbox"
-                    checked={roadCondition === "NOT_PASSABLE"}
-                    onChange={(e) => setRoadCondition(e.target.checked ? "NOT_PASSABLE" : "PASSABLE")}
-                    className="h-5 w-5 shrink-0 accent-(--color-brand)"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-(--color-ink)">
-                      Hindi madaanan ang kalsada
-                    </span>
-                    <span className="block text-xs text-(--color-ink-muted)">
-                      Iwanang blangko kung nadaanan mo naman.
-                    </span>
-                  </span>
-                </label>
-
-                {/*
                   Only asked in MMDA's NPLV band, where passability really
                   does depend on the vehicle ("not passable to LIGHT
                   vehicles"). Deeper than that nothing passes and shallower
@@ -430,6 +413,24 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
                   predetermined either way — a field that collects no
                   information but costs the reporter a decision.
                 */}
+                {/*
+                  At NPATV every vehicle type is recorded as affected,
+                  because that is what the band means. Saying so matters:
+                  writing six claims into a report without the reporter
+                  seeing them is the same silent-data problem as keeping a
+                  hidden field's answer. Stated, not assumed.
+                */}
+                {vehicleTypes.length > 0 && !askVehicleTypes && (
+                  <p
+                    data-testid="vehicles-auto"
+                    className="rounded-lg bg-(--color-paper) px-3 py-2 text-xs text-(--color-ink-muted)"
+                  >
+                    Sa lalim na ito, <strong className="font-semibold">lahat ng uri ng
+                    sasakyan</strong> ({vehicleTypes.length}) ang itatala bilang apektado —
+                    walang nakakadaan ayon sa MMDA.
+                  </p>
+                )}
+
                 {askVehicleTypes && (
                 <fieldset>
                   <legend className="text-sm font-medium text-(--color-ink)">

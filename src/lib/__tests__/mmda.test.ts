@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   NPATV_MIN_CM,
   PATV_MAX_CM,
+  getDefaultVehicleTypes,
+  getDerivedRoadCondition,
   getMmdaAssessment,
   isNoVehiclePassable,
   shouldAskVehicleTypes,
 } from "../mmda";
 import { DEPTH_SCALE, getWaterlineCm, isImpassable } from "../floodScale";
-import type { FloodDepthCode } from "../types";
+import { VEHICLE_TYPE_OPTIONS, type FloodDepthCode } from "../types";
 
 /**
  * MMDA's 2024 flood gauge, verified against reporting of the official
@@ -127,5 +129,79 @@ describe("presentation", () => {
     expect(a.code).toBe("NPLV");
     expect(a.label).toMatch(/light vehicles/i);
     expect(a.expansion).toBe("Not passable to light vehicles");
+  });
+});
+
+/**
+ * The report form no longer asks about road condition or, at NPATV, about
+ * vehicles. Both are entailed by the depth, so they are derived. These
+ * pin the derivations, because a silent wrong default writes bad data
+ * into every report rather than showing up as a visible bug.
+ */
+describe("derived road condition", () => {
+  it("replaces a tickbox that could contradict the band", () => {
+    // The old form let a reporter tick "hindi madaanan" at gutter-deep,
+    // producing a record whose passability claim fought the one shown.
+    expect(getDerivedRoadCondition("GUTTER_DEEP")).toBe("PASSABLE");
+    expect(getDerivedRoadCondition("BUKONG_BUKONG")).toBe("PASSABLE");
+    expect(getDerivedRoadCondition("BINTI")).toBe("DIFFICULT");
+    expect(getDerivedRoadCondition("TUHOD")).toBe("DIFFICULT");
+    expect(getDerivedRoadCondition("HITA")).toBe("NOT_PASSABLE");
+    expect(getDerivedRoadCondition("BAYWANG")).toBe("NOT_PASSABLE");
+    expect(getDerivedRoadCondition("HINDI_MADAANAN")).toBe("NOT_PASSABLE");
+  });
+
+  it("calls a dry road passable and has nothing to say with no depth", () => {
+    expect(getDerivedRoadCondition("WALANG_BAHA")).toBe("PASSABLE");
+    expect(getDerivedRoadCondition(null)).toBeNull();
+  });
+
+  it("never disagrees with the band the UI displays", () => {
+    for (const o of DEPTH_SCALE) {
+      const rc = getDerivedRoadCondition(o.code);
+      if (isNoVehiclePassable(o.code)) expect(rc).toBe("NOT_PASSABLE");
+      else expect(rc).not.toBe("NOT_PASSABLE");
+    }
+  });
+});
+
+describe("default vehicle types", () => {
+  it("pre-ticks the light vehicles in the NPLV band", () => {
+    // "Not passable to LIGHT vehicles" names them, so this is entailed
+    // rather than guessed. The reporter can still untick either.
+    expect(getDefaultVehicleTypes("BINTI")).toEqual(["MOTORCYCLE", "SEDAN"]);
+    expect(getDefaultVehicleTypes("TUHOD")).toEqual(["MOTORCYCLE", "SEDAN"]);
+  });
+
+  it("marks every type at NPATV, which is what the band means", () => {
+    for (const code of ["HITA", "BAYWANG", "HINDI_MADAANAN"] as const) {
+      const v = getDefaultVehicleTypes(code);
+      expect(v).toHaveLength(VEHICLE_TYPE_OPTIONS.length);
+      for (const o of VEHICLE_TYPE_OPTIONS) expect(v).toContain(o.code);
+    }
+  });
+
+  it("marks nothing where every vehicle gets through", () => {
+    expect(getDefaultVehicleTypes("WALANG_BAHA")).toEqual([]);
+    expect(getDefaultVehicleTypes("GUTTER_DEEP")).toEqual([]);
+    expect(getDefaultVehicleTypes("BUKONG_BUKONG")).toEqual([]);
+    expect(getDefaultVehicleTypes(null)).toEqual([]);
+  });
+
+  it("only returns codes the form actually offers", () => {
+    const valid = new Set(VEHICLE_TYPE_OPTIONS.map((o) => o.code));
+    for (const o of DEPTH_SCALE) {
+      for (const v of getDefaultVehicleTypes(o.code)) expect(valid.has(v)).toBe(true);
+    }
+  });
+
+  it("the band that gets asked is the only one with a partial default", () => {
+    // A partial list is a prompt to correct it; a full or empty list is a
+    // statement. Only NPLV should be a prompt.
+    for (const o of DEPTH_SCALE) {
+      const v = getDefaultVehicleTypes(o.code);
+      const partial = v.length > 0 && v.length < VEHICLE_TYPE_OPTIONS.length;
+      expect(partial).toBe(shouldAskVehicleTypes(o.code));
+    }
   });
 });
