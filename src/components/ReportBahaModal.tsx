@@ -2,6 +2,7 @@
 
 import { FloodDepthPicker } from "@/components/FloodDepthPicker";
 import { LocationPickerMapLoader } from "@/components/LocationPickerMapLoader";
+import { shouldAskVehicleTypes } from "@/lib/mmda";
 import { Modal } from "@/components/Modal";
 import { SearchBox } from "@/components/SearchBox";
 import { useGeolocation } from "@/hooks/useGeolocation";
@@ -77,6 +78,28 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
   const [reporterName, setReporterName] = useState("");
   const [anonymous, setAnonymous] = useState(true);
   const [showOptional, setShowOptional] = useState(false);
+
+  /**
+   * Vehicle type is only a meaningful question inside MMDA's NPLV band.
+   * Derived from the chosen depth rather than stored, so it can never
+   * disagree with the picker.
+   */
+  const askVehicleTypes = shouldAskVehicleTypes(floodDepth);
+
+  /**
+   * Changing depth out of the NPLV band clears any vehicles already
+   * ticked.
+   *
+   * Without this, picking Tuhod, ticking "Sedan", then moving to Baywang
+   * hides the field but keeps the answer — and submits a report claiming
+   * a sedan was affected at a depth where we never asked and where the
+   * claim means something different. Silently submitting an answer the
+   * user can no longer see is worse than losing their tick.
+   */
+  function handleDepthChange(code: FloodDepthCode) {
+    setFloodDepth(code);
+    if (!shouldAskVehicleTypes(code)) setVehicleTypes([]);
+  }
 
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
 
@@ -361,7 +384,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
             </p>
           </div>
 
-          <FloodDepthPicker value={floodDepth} onChange={setFloodDepth} />
+          <FloodDepthPicker value={floodDepth} onChange={handleDepthChange} />
 
           <div>
             <button
@@ -399,12 +422,22 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
                   </span>
                 </label>
 
+                {/*
+                  Only asked in MMDA's NPLV band, where passability really
+                  does depend on the vehicle ("not passable to LIGHT
+                  vehicles"). Deeper than that nothing passes and shallower
+                  than that everything does, so the answer would be
+                  predetermined either way — a field that collects no
+                  information but costs the reporter a decision.
+                */}
+                {askVehicleTypes && (
                 <fieldset>
                   <legend className="text-sm font-medium text-(--color-ink)">
                     Anong sasakyan ang apektado?
                   </legend>
                   <p className="mt-0.5 text-xs text-(--color-ink-muted)">
-                    Puwedeng higit sa isa.
+                    Sa lalim na ito, may sasakyang nakakadaan at may hindi — kaya
+                    malaking tulong kung alam natin kung alin.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {VEHICLE_TYPE_OPTIONS.map((o) => {
@@ -431,6 +464,7 @@ export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: R
                     })}
                   </div>
                 </fieldset>
+                )}
               </div>
             )}
           </div>

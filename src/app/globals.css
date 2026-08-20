@@ -125,3 +125,41 @@ body {
 .animate-pulse-soft {
   animation: pulse-soft 1.6s ease-in-out infinite;
 }
+
+/*
+ * Vertical flood-depth slider.
+ *
+ * `writing-mode: vertical-lr` + `direction: rtl` is the modern way to get
+ * a real vertical range input: the element stays a genuine
+ * <input type="range">, so keyboard, screen readers and touch behave
+ * natively. The older trick — rotating a horizontal input — breaks hit
+ * areas and confuses assistive tech about which end is the minimum.
+ *
+ * rtl puts the minimum at the BOTTOM, so dragging up raises the water,
+ * which is the whole point of the interaction.
+ */
+.mbb-depth-slider {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  /* 24px keeps the thumb inside WCAG 2.5.8's target size even though the
+     track itself is narrow. */
+  min-width: 24px;
+}
+
+.mbb-depth-slider::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+}
+
+.mbb-depth-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mbb-scene-animated {
+    transition:
+      y 220ms ease-out,
+      height 220ms ease-out;
+  }
+}

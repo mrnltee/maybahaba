@@ -1,8 +1,12 @@
 "use client";
 
 import { AreaResultCard } from "@/components/AreaResultCard";
+import { FloodDepthPicker } from "@/components/FloodDepthPicker";
+import { FloodScene } from "@/components/FloodScene";
+import { DEPTH_SCALE, formatWaterline } from "@/lib/floodScale";
+import { useState } from "react";
 import { ResultCard } from "@/components/ResultCard";
-import type { AreaSearchResult, FloodReport, NearbySearchResult } from "@/lib/types";
+import type { AreaSearchResult, FloodDepthCode, FloodReport, NearbySearchResult } from "@/lib/types";
 import { notFound } from "next/navigation";
 
 /**
@@ -210,6 +214,52 @@ export default function PreviewPage() {
           </section>
         ))}
       </div>
-    </main>
+    
+      {/* ---- Flood depth selector ---------------------------------- */}
+      <section className="mt-16">
+        <h2 className="text-lg font-bold text-(--color-ink)">Flood depth selector</h2>
+        <p className="mt-1 text-sm text-(--color-ink-muted)">
+          Live component. Drag the slider — the water should rise, and the highlighted
+          area below it should grow.
+        </p>
+        <div className="mt-4 max-w-2xl">
+          <DepthPickerHarness />
+        </div>
+
+        <h3 className="mt-10 text-sm font-semibold text-(--color-ink)">
+          Every level at once — the water should never drop as you read down
+        </h3>
+        <p className="mt-1 text-xs text-(--color-ink-muted)">
+          Check the pedestrian on the right: at Tuhod the line should meet the knee, at
+          Baywang the waist. If it does not, the scene and the labels disagree.
+        </p>
+        <ul className="mt-3 space-y-3">
+          {DEPTH_SCALE.map((o) => (
+            <li key={o.code} className="rounded-xl border border-(--color-border) p-2">
+              <p className="mb-1 text-xs font-semibold text-(--color-ink)">
+                {o.label}
+                <span className="ml-2 font-normal text-(--color-ink-faint)">
+                  {formatWaterline(o.code) ?? "walang tubig"}
+                </span>
+              </p>
+              <FloodScene code={o.code} className="w-full" />
+            </li>
+          ))}
+        </ul>
+      </section>
+</main>
+  );
+}
+
+/** Stateful wrapper so the preview page can exercise the real component. */
+function DepthPickerHarness() {
+  const [depth, setDepth] = useState<FloodDepthCode | null>(null);
+  return (
+    <>
+      <FloodDepthPicker value={depth} onChange={setDepth} />
+      <p className="mt-2 text-xs text-(--color-ink-faint)">
+        Value handed to the form: <code>{depth ?? "null (nothing chosen yet)"}</code>
+      </p>
+    </>
   );
 }
