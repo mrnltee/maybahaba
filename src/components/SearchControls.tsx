@@ -115,35 +115,43 @@ export function SearchControls({
 
   return (
     <div className="mt-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={onUseMyLocation}
-          disabled={locating}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-(--color-border-strong) px-4 py-2 text-sm font-medium text-(--color-ink) hover:bg-(--color-surface) disabled:opacity-60"
-        >
-          <LocateFixed className="h-4 w-4" aria-hidden="true" />
-          {locating ? "Kinukuha…" : "Use my location"}
-        </button>
+      {/*
+        Phone layout stacks: the two location buttons on one row, then the
+        radius control spanning the full width beneath them. Cramming the
+        radius onto the end of the button row left it stranded on a second
+        line, right-aligned against nothing.
+      */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onUseMyLocation}
+            disabled={locating}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-(--color-border-strong) px-4 py-2 text-sm font-medium text-(--color-ink) hover:bg-(--color-surface) disabled:opacity-60"
+          >
+            <LocateFixed className="h-4 w-4" aria-hidden="true" />
+            {locating ? "Kinukuha…" : "Use my location"}
+          </button>
 
-        <button
-          type="button"
-          onClick={() => void openPinMap()}
-          disabled={centeringOnDevice}
-          aria-expanded={pinning}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-(--color-border-strong) px-4 py-2 text-sm font-medium text-(--color-ink) hover:bg-(--color-surface)"
-        >
-          <MapIcon className="h-4 w-4" aria-hidden="true" />
-          {pinning ? "Isara ang mapa" : centeringOnDevice ? "Kinukuha…" : "Pin on map"}
-        </button>
+          <button
+            type="button"
+            onClick={() => void openPinMap()}
+            disabled={centeringOnDevice}
+            aria-expanded={pinning}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-(--color-border-strong) px-4 py-2 text-sm font-medium text-(--color-ink) hover:bg-(--color-surface)"
+          >
+            <MapIcon className="h-4 w-4" aria-hidden="true" />
+            {pinning ? "Isara ang mapa" : centeringOnDevice ? "Kinukuha…" : "Pin on map"}
+          </button>
+        </div>
 
-        <label className="ml-auto inline-flex min-h-11 items-center gap-2 text-sm text-(--color-ink-muted)">
+        <label className="inline-flex w-full min-h-11 items-center gap-2 text-sm text-(--color-ink-muted) sm:ml-auto sm:w-auto">
           <span className="whitespace-nowrap">Layo:</span>
           <select
             value={radiusMeters}
             onChange={(e) => onRadiusChange(Number(e.target.value))}
             aria-label="Lawak ng paghahanap"
-            className="min-h-11 rounded-full border border-(--color-border-strong) bg-(--color-surface) px-3 py-2 text-sm font-medium text-(--color-ink)"
+            className="min-h-11 w-full flex-1 rounded-full border border-(--color-border-strong) bg-(--color-surface) px-3 py-2 text-sm font-medium text-(--color-ink) sm:w-auto sm:flex-none"
           >
             {SEARCH_RADIUS_OPTIONS_METERS.map((m) => (
               <option key={m} value={m}>
