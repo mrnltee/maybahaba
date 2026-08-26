@@ -23,6 +23,11 @@ export function deriveStatus(topReport: FloodReport | null): MayBahaStatus {
   // report ages out normally.
 
   const depth = getFloodDepthOption(topReport.floodDepth);
+  // "Humupa na" is not the same claim as "walang baha". It says water was
+  // here recently and has drained — which is exactly the situation where
+  // it can come back within the hour, so it gets its own status rather
+  // than being folded into the reassuring one.
+  if (depth.code === "HUMUPA_NA") return "SUBSIDED";
   if (depth.code === "WALANG_BAHA") return "NO_FLOOD_REPORTED";
   if (depth.code === "HINDI_MADAANAN") return "ROAD_IMPASSABLE";
   if (depth.severity >= 6) return "SEVERE_FLOODING";
@@ -42,6 +47,11 @@ export const STATUS_COPY: Record<
     headline: "Walang Baha",
     sub: "Ang pinakabagong report sa lugar na ito ay walang baha.",
     tone: "safe",
+  },
+  SUBSIDED: {
+    headline: "Humupa Na",
+    sub: "Iniulat na humupa na ang baha dito. Mag-ingat pa rin — maaaring bumalik ang tubig.",
+    tone: "warning",
   },
   FLOODED: {
     headline: "May Baha",

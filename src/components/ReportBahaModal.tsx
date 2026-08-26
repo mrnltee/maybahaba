@@ -2,30 +2,39 @@
 
 import { FloodDepthPicker } from "@/components/FloodDepthPicker";
 import { LocationPickerMapLoader } from "@/components/LocationPickerMapLoader";
+import {
+  getDefaultVehicleTypes,
+  getDerivedRoadCondition,
+  shouldAskVehicleTypes,
+} from "@/lib/mmda";
 import { Modal } from "@/components/Modal";
 import { SearchBox } from "@/components/SearchBox";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { METRO_MANILA_CENTER } from "@/lib/geo";
-import { phLocalInputToUtcIso, utcIsoToPhLocalInput } from "@/lib/time";
+import { formatPhTimeShort, phLocalInputToUtcIso, utcIsoToPhLocalInput } from "@/lib/time";
 import {
-  ROAD_CONDITION_OPTIONS,
   VEHICLE_TYPE_OPTIONS,
   type DuplicateCheckResult,
   type FloodDepthCode,
   type FloodReport,
   type LocationResult,
-  type RoadConditionCode,
   type VehicleTypeCode,
 } from "@/lib/types";
 import { getFloodDepthOption } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/time";
-import { CheckCircle2, LocateFixed, Map as MapIcon, TriangleAlert } from "lucide-react";
-import { useId, useState } from "react";
+import { Check, CheckCircle2, LocateFixed, Map as MapIcon, MapPinned, TriangleAlert } from "lucide-react";
+import { useEffect, useId, useState } from "react";
 
 interface ReportBahaModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: (report: FloodReport) => void;
+  /**
+   * Pre-fills the location, e.g. when the user tapped a spot on the map.
+   * Consumed as initial state, so the caller should remount the modal
+   * (via a changing `key`) to apply a new one.
+   */
+  initialLocation?: { latitude: number; longitude: number } | null;
 }
 
 type SelectedLocation = {
@@ -45,21 +54,59 @@ type SubmitState =
   | { kind: "error"; message: string }
   | { kind: "success"; report: FloodReport };
 
-export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalProps) {
+export function ReportBahaModal({ open, onClose, onSuccess, initialLocation }: ReportBahaModalProps) {
   const titleId = useId();
   const { getCurrentPosition, loading: locating } = useGeolocation();
 
-  const [location, setLocation] = useState<SelectedLocation | null>(null);
-  const [showMap, setShowMap] = useState(false);
+  const [location, setLocation] = useState<SelectedLocation | null>(
+    initialLocation
+      ? {
+          latitude: initialLocation.latitude,
+          longitude: initialLocation.longitude,
+          label: "Naka-pin na lokasyon",
+          street: null,
+          barangay: null,
+          city: null,
+          province: null,
+        }
+      : null
+  );
+  const [showMap, setShowMap] = useState(Boolean(initialLocation));
   const [locationError, setLocationError] = useState<string | null>(null);
 
   const [reportedAtLocal, setReportedAtLocal] = useState(() => utcIsoToPhLocalInput(new Date().toISOString()));
   const [floodDepth, setFloodDepth] = useState<FloodDepthCode | null>(null);
-  const [roadCondition, setRoadCondition] = useState<RoadConditionCode | "">("");
-  const [vehicleType, setVehicleType] = useState<VehicleTypeCode | "">("");
+  const [vehicleTypes, setVehicleTypes] = useState<VehicleTypeCode[]>([]);
   const [reporterName, setReporterName] = useState("");
   const [anonymous, setAnonymous] = useState(true);
   const [showOptional, setShowOptional] = useState(false);
+
+  /**
+   * Vehicle type is only a meaningful question inside MMDA's NPLV band.
+   * Derived from the chosen depth rather than stored, so it can never
+   * disagree with the picker.
+   */
+  const askVehicleTypes = shouldAskVehicleTypes(floodDepth);
+
+  /**
+   * Changing depth out of the NPLV band clears any vehicles already
+   * ticked.
+   *
+   * Without this, picking Tuhod, ticking "Sedan", then moving to Baywang
+   * hides the field but keeps the answer — and submits a report claiming
+   * a sedan was affected at a depth where we never asked and where the
+   * claim means something different. Silently submitting an answer the
+   * user can no longer see is worse than losing their tick.
+   */
+  function handleDepthChange(code: FloodDepthCode) {
+    setFloodDepth(code);
+    // Seed from the band rather than carrying the previous depth's answer
+    // across. At NPLV this pre-ticks the light vehicles the reporter can
+    // then adjust; at NPATV it records every type, which is what the band
+    // means; elsewhere it clears. Either way the vehicles on file always
+    // correspond to the depth actually chosen.
+    setVehicleTypes(getDefaultVehicleTypes(code));
+  }
 
   const [submitState, setSubmitState] = useState<SubmitState>({ kind: "idle" });
 
@@ -69,8 +116,7 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
     setLocationError(null);
     setReportedAtLocal(utcIsoToPhLocalInput(new Date().toISOString()));
     setFloodDepth(null);
-    setRoadCondition("");
-    setVehicleType("");
+    setVehicleTypes([]);
     setReporterName("");
     setAnonymous(true);
     setShowOptional(false);
@@ -151,9 +197,26 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
     }
   }
 
+  // When the user arrived here by tapping the map, resolve those raw
+  // coordinates into a readable address so the report isn't filed as
+  // "Naka-pin na lokasyon". Runs once per mount; the caller remounts via
+  // `key` when the pinned location changes.
+  useEffect(() => {
+    if (initialLocation) {
+      void handlePinChange(initialLocation.latitude, initialLocation.longitude);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function openBlankMap() {
     setLocation((prev) => prev ?? { ...METRO_MANILA_CENTER, label: "", street: null, barangay: null, city: null, province: null });
     setShowMap(true);
+  }
+
+  function toggleVehicleType(code: VehicleTypeCode) {
+    setVehicleTypes((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
   }
 
   async function submitReport(acknowledgedDuplicateId: string | null) {
@@ -173,8 +236,9 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
           city: location.city,
           province: location.province,
           floodDepth,
-          roadCondition: roadCondition || null,
-          vehicleType: vehicleType || null,
+          // Derived from depth, never asked — see getDerivedRoadCondition.
+          roadCondition: getDerivedRoadCondition(floodDepth),
+          vehicleTypes,
           reportedAt: phLocalInputToUtcIso(reportedAtLocal),
           reporterName: anonymous ? null : reporterName.trim() || null,
           anonymous,
@@ -243,7 +307,7 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
                 type="button"
                 onClick={handleUseMyLocation}
                 disabled={locating}
-                className="inline-flex items-center gap-1.5 rounded-full border border-(--color-border) px-3 py-1.5 text-xs font-medium text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 rounded-full border border-(--color-border-strong) px-3 py-1.5 text-xs font-medium text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-60"
               >
                 <LocateFixed className="h-3.5 w-3.5" aria-hidden="true" />
                 {locating ? "Kinukuha ang lokasyon…" : "Use My Location"}
@@ -251,13 +315,39 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
               <button
                 type="button"
                 onClick={openBlankMap}
-                className="inline-flex items-center gap-1.5 rounded-full border border-(--color-border) px-3 py-1.5 text-xs font-medium text-(--color-ink) hover:bg-(--color-paper)"
+                className="inline-flex items-center gap-1.5 rounded-full border border-(--color-border-strong) px-3 py-1.5 text-xs font-medium text-(--color-ink) hover:bg-(--color-paper)"
               >
                 <MapIcon className="h-3.5 w-3.5" aria-hidden="true" />
                 Pin on Map
               </button>
             </div>
             {locationError && <p className="mt-2 text-sm text-(--color-danger)">{locationError}</p>}
+
+            {/*
+              The resolved address, shown explicitly.
+
+              Previously this only lived inside SearchBox's `initialValue`,
+              which is initial state — so pinning the map or using current
+              location reverse-geocoded correctly but the name never
+              appeared. You were filing reports without being able to see
+              where they'd land.
+            */}
+            {location && (
+              <div
+                aria-live="polite"
+                className="mt-3 flex items-start gap-2 rounded-xl border border-(--color-border) bg-(--color-paper) px-3 py-2.5"
+              >
+                <MapPinned className="mt-0.5 h-4 w-4 shrink-0 text-(--color-ink-faint)" aria-hidden="true" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-(--color-ink)">
+                    {location.label || "Naka-pin na lokasyon"}
+                  </p>
+                  <p className="text-xs text-(--color-ink-faint)">
+                    {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {showMap && location && (
               <div className="mt-3">
@@ -275,7 +365,7 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
 
           <div>
             <label className="text-sm font-semibold text-(--color-ink)" htmlFor="report-time">
-              Kailan naganap?
+              Anong oras mo nakita?
             </label>
             <input
               id="report-time"
@@ -283,11 +373,25 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
               value={reportedAtLocal}
               onChange={(e) => setReportedAtLocal(e.target.value)}
               max={utcIsoToPhLocalInput(new Date().toISOString())}
-              className="mt-2 w-full rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-3 text-sm text-(--color-ink) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
+              className="mt-2 w-full rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-4 py-3 text-sm text-(--color-ink) focus-visible:outline-3 focus-visible:outline-(--color-brand)"
             />
+            {/*
+              Time is what matters to a motorist — "as of 5:42 PM" is the
+              whole point. The date stays in the input because a report
+              filed just after midnight would otherwise be ambiguous, but
+              the feedback line below is phrased in the terms a reader
+              cares about, so a mis-set date is obvious before submitting.
+            */}
+            <p aria-live="polite" className="mt-1.5 text-xs text-(--color-ink-muted)">
+              Ire-report bilang:{" "}
+              <span className="font-medium text-(--color-ink)">
+                {formatRelativeTime(phLocalInputToUtcIso(reportedAtLocal))}
+              </span>{" "}
+              ({formatPhTimeShort(phLocalInputToUtcIso(reportedAtLocal))})
+            </p>
           </div>
 
-          <FloodDepthPicker value={floodDepth} onChange={setFloodDepth} />
+          <FloodDepthPicker value={floodDepth} onChange={handleDepthChange} />
 
           <div>
             <button
@@ -300,44 +404,68 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
             </button>
 
             {showOptional && (
-              <div className="mt-3 space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-(--color-ink)" htmlFor="road-condition">
-                    Road condition
-                  </label>
-                  <select
-                    id="road-condition"
-                    value={roadCondition}
-                    onChange={(e) => setRoadCondition(e.target.value as RoadConditionCode | "")}
-                    className="mt-1.5 w-full rounded-xl border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm text-(--color-ink)"
+              <div className="mt-3 space-y-5">
+                {/*
+                  Only asked in MMDA's NPLV band, where passability really
+                  does depend on the vehicle ("not passable to LIGHT
+                  vehicles"). Deeper than that nothing passes and shallower
+                  than that everything does, so the answer would be
+                  predetermined either way — a field that collects no
+                  information but costs the reporter a decision.
+                */}
+                {/*
+                  At NPATV every vehicle type is recorded as affected,
+                  because that is what the band means. Saying so matters:
+                  writing six claims into a report without the reporter
+                  seeing them is the same silent-data problem as keeping a
+                  hidden field's answer. Stated, not assumed.
+                */}
+                {vehicleTypes.length > 0 && !askVehicleTypes && (
+                  <p
+                    data-testid="vehicles-auto"
+                    className="rounded-lg bg-(--color-paper) px-3 py-2 text-xs text-(--color-ink-muted)"
                   >
-                    <option value="">Not specified</option>
-                    {ROAD_CONDITION_OPTIONS.map((o) => (
-                      <option key={o.code} value={o.code}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    Sa lalim na ito, <strong className="font-semibold">lahat ng uri ng
+                    sasakyan</strong> ({vehicleTypes.length}) ang itatala bilang apektado —
+                    walang nakakadaan ayon sa MMDA.
+                  </p>
+                )}
 
-                <div>
-                  <label className="text-sm font-medium text-(--color-ink)" htmlFor="vehicle-type">
-                    Vehicle type
-                  </label>
-                  <select
-                    id="vehicle-type"
-                    value={vehicleType}
-                    onChange={(e) => setVehicleType(e.target.value as VehicleTypeCode | "")}
-                    className="mt-1.5 w-full rounded-xl border border-(--color-border) bg-(--color-surface) px-3 py-2.5 text-sm text-(--color-ink)"
-                  >
-                    <option value="">Not specified</option>
-                    {VEHICLE_TYPE_OPTIONS.map((o) => (
-                      <option key={o.code} value={o.code}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {askVehicleTypes && (
+                <fieldset>
+                  <legend className="text-sm font-medium text-(--color-ink)">
+                    Anong sasakyan ang apektado?
+                  </legend>
+                  <p className="mt-0.5 text-xs text-(--color-ink-muted)">
+                    Sa lalim na ito, may sasakyang nakakadaan at may hindi — kaya
+                    malaking tulong kung alam natin kung alin.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {VEHICLE_TYPE_OPTIONS.map((o) => {
+                      const checked = vehicleTypes.includes(o.code);
+                      return (
+                        <label
+                          key={o.code}
+                          className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-(--color-brand) ${
+                            checked
+                              ? "border-(--color-brand) bg-(--color-brand)/5 font-semibold text-(--color-ink)"
+                              : "border-(--color-border-strong) bg-(--color-surface) text-(--color-ink)"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleVehicleType(o.code)}
+                            className="sr-only"
+                          />
+                          {checked && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+                          {o.label}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+                )}
               </div>
             )}
           </div>
@@ -355,7 +483,7 @@ export function ReportBahaModal({ open, onClose, onSuccess }: ReportBahaModalPro
                 onChange={(e) => setReporterName(e.target.value)}
                 placeholder="Optional name / nickname"
                 maxLength={60}
-                className="flex-1 rounded-xl border border-(--color-border) bg-(--color-surface) px-4 py-2.5 text-sm text-(--color-ink) disabled:opacity-50"
+                className="flex-1 rounded-xl border border-(--color-border-strong) bg-(--color-surface) px-4 py-2.5 text-sm text-(--color-ink) disabled:opacity-50"
               />
             </div>
             <label className="mt-2 flex items-center gap-2 text-sm text-(--color-ink-muted)">

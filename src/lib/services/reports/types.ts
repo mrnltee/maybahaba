@@ -1,4 +1,5 @@
 import type {
+  AreaBounds,
   CommunityAction,
   FloodReport,
   ReportStatus,
@@ -15,11 +16,18 @@ export interface CreateReportInput {
   province: string | null;
   floodDepth: FloodReport["floodDepth"];
   roadCondition: FloodReport["roadCondition"];
-  vehicleType: FloodReport["vehicleType"];
+  vehicleTypes: FloodReport["vehicleTypes"];
   /** UTC ISO string. */
   reportedAt: string;
   reporterName: string | null;
   anonymous: boolean;
+  /**
+   * Set when this report answers an earlier one via "Tulungan ang
+   * susunod". A follow-up is always a new row — the original reporter's
+   * observation was true when they made it, so it is preserved rather
+   * than edited.
+   */
+  followUpTo?: string | null;
 }
 
 export interface PendingReportsFilter {
@@ -37,6 +45,12 @@ export interface PendingReportsFilter {
 export interface ReportService {
   /** Reports within `radiusMeters` of a point, most recent first, excludes DENIED. */
   getNearby(latitude: number, longitude: number, radiusMeters: number): Promise<FloodReport[]>;
+  /**
+   * Every report inside a geographic envelope — used for city/barangay/
+   * province searches. Geographic rather than name-matched so a geocoder
+   * name variant can never silently hide reports.
+   */
+  getInArea(bounds: AreaBounds, limit?: number): Promise<FloodReport[]>;
   getById(id: string): Promise<FloodReport | null>;
   create(input: CreateReportInput): Promise<FloodReport>;
   applyValidation(
@@ -55,6 +69,13 @@ export interface ReportService {
     validatorRef: string
   ): Promise<FloodReport | null>;
   getPending(filter: PendingReportsFilter): Promise<FloodReport[]>;
+  /**
+   * Every report regardless of status — moderator view only.
+   * Unlike the public queries this deliberately includes DENIED and
+   * EXPIRED rows, since the whole point of the admin table is to see
+   * what was filed and what happened to it.
+   */
+  getAllForAdmin(limit?: number): Promise<FloodReport[]>;
   /** Marks reports older than the expiry window as EXPIRED. Safe to call often; idempotent. */
   sweepExpired(): Promise<number>;
 }

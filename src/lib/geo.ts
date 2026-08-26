@@ -32,3 +32,25 @@ export const METRO_MANILA_VIEWBOX = {
 };
 
 export const METRO_MANILA_CENTER = { latitude: 14.5995, longitude: 120.9842 };
+
+/** Human-readable distance, tuned for glanceability rather than precision. */
+export function formatDistance(meters: number): string {
+  if (meters < 100) return "malapit lang";
+  if (meters < 1000) return `${Math.round(meters / 10) * 10} m`;
+  if (meters < 10000) return `${(meters / 1000).toFixed(1)} km`;
+  return `${Math.round(meters / 1000)} km`;
+}
+
+/**
+ * "X away from <somewhere>", phrased so it stays grammatical at every
+ * distance.
+ *
+ * `formatDistance` returns a *phrase* ("malapit lang") below 100 m rather
+ * than a measurement, so naively appending "mula sa ..." produces
+ * "malapit lang mula sa hinanap" — which is not Filipino. Under that
+ * threshold the preposition changes instead.
+ */
+export function formatDistanceFrom(meters: number, fromLabel: string): string {
+  if (meters < 100) return `malapit lang sa ${fromLabel}`;
+  return `${formatDistance(meters)} mula sa ${fromLabel}`;
+}

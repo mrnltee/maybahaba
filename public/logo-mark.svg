@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MayBahaBa">
+  <defs><clipPath id="m"><circle cx="32" cy="32" r="30"/></clipPath></defs>
+  <circle cx="32" cy="32" r="30" fill="#1E3A8A"/>
+  <g clip-path="url(#m)">
+    <!-- Car: solid, not outlined. Outline strokes merge into an arch at
+         16px; a filled silhouette keeps its shape all the way down. -->
+    <path fill="#FFFFFF" d="M15 34.2c0-1 .5-1.9 1.4-2.4l3.1-1.9 3.1-4.4c.7-1 1.9-1.6 3.1-1.6h12.6c1.2 0 2.4.6 3.1 1.6l3.1 4.4 3.1 1.9c.9.5 1.4 1.4 1.4 2.4v3.4c0 1-.8 1.9-1.9 1.9H16.9c-1 0-1.9-.8-1.9-1.9Z"/>
+    <path fill="#1E3A8A" d="M26.4 26.6h11.2l2.7 3.9H23.7Z"/>
+    <circle cx="23" cy="39.4" r="3" fill="#1E3A8A"/>
+    <circle cx="41" cy="39.4" r="3" fill="#1E3A8A"/>
+    <!-- Water crossing the lower third -->
+    <path fill="#3B82F6" d="M0 43c8 0 8 4.2 16 4.2S24 43 32 43s8 4.2 16 4.2S56 43 64 43v6c-8 0-8 4.2-16 4.2S40 49 32 49s-8 4.2-16 4.2S8 49 0 49Z"/>
+    <path fill="#FFFFFF" opacity=".9" d="M0 52c8 0 8 3.6 16 3.6S24 52 32 52s8 3.6 16 3.6S56 52 64 52v3.4c-8 0-8 3.6-16 3.6s-8-3.6-16-3.6-8 3.6-16 3.6S8 55.4 0 55.4Z"/>
+  </g>
+</svg>

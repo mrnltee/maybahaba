@@ -54,7 +54,7 @@ export function LocationPickerMap({
       const icon = L.divIcon({
         className: "",
         html: `<div style="width:26px;height:26px;transform:translateY(-4px)">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="#0f5c73" stroke="white" stroke-width="1"><path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="#1E3A8A" stroke="white" stroke-width="1"><path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
         </div>`,
         iconSize: [26, 26],
         iconAnchor: [13, 26],

@@ -5,7 +5,7 @@ import type { CommunityAction, FloodReport } from "@/lib/types";
 import { Check, X } from "lucide-react";
 import { useState, useSyncExternalStore } from "react";
 
-interface ValidationControlsProps {
+interface AccuracyControlsProps {
   report: FloodReport;
   /** Compact styling for use inside a Leaflet map popup. */
   compact?: boolean;
@@ -15,17 +15,20 @@ interface ValidationControlsProps {
 type VoteState = "idle" | "sending" | "done" | "already" | "error";
 
 /**
- * Public community validation (spec section 16).
+ * "Was this report right?" — the accuracy half of community validation
+ * (spec section 16).
  *
- * Two independent questions, shown as separate rows because they mean
- * different things — a report can be accurate but no longer current.
- * Both are optional and require no account.
+ * The currency half ("is it still flooded?") moved to FollowUpFlow,
+ * which turns it into a real status update rather than a tally. This
+ * stayed separate on purpose: a report can be perfectly accurate and no
+ * longer current, and only *this* question should flag something for a
+ * moderator or grey it out on the map.
  *
- * Accessibility: each row is a labelled group, buttons carry explicit
- * text (not icon-only), and the resulting state is announced via
- * aria-live rather than being conveyed by colour alone.
+ * Accessibility: the row is a labelled group, buttons carry explicit
+ * text (not icon-only), and the result is announced via aria-live rather
+ * than being conveyed by colour alone.
  */
-export function ValidationControls({ report, compact = false, onVoted }: ValidationControlsProps) {
+export function AccuracyControls({ report, compact = false, onVoted }: AccuracyControlsProps) {
   const [state, setState] = useState<VoteState>("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -77,9 +80,12 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
   const disabled = state === "sending";
   const settled = state === "done" || state === "already" || alreadyVotedLocally;
 
+  // WCAG 2.2 AA (2.5.8) only requires 24x24, which the old sizes met.
+  // These are bigger anyway: the target user is tapping one-handed,
+  // outdoors, possibly in the rain (spec section 25).
   const buttonBase = compact
-    ? "rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-    : "rounded-full border px-3 py-1.5 text-xs font-semibold";
+    ? "inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+    : "inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-xs font-semibold";
 
   if (settled) {
     return (
@@ -97,33 +103,6 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
     <div className={compact ? "space-y-1.5" : "space-y-2.5"}>
       <div className="flex flex-wrap items-center gap-2">
         <span
-          id={`currency-${report.id}`}
-          className={`text-(--color-ink-muted) ${compact ? "text-[11px]" : "text-xs"}`}
-        >
-          Baha pa rin ba?
-        </span>
-        <div role="group" aria-labelledby={`currency-${report.id}`} className="flex gap-1.5">
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => vote("STILL_FLOODED")}
-            className={`${buttonBase} border-(--color-border) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
-          >
-            Oo, may baha pa
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => vote("NO_LONGER_FLOODED")}
-            className={`${buttonBase} border-(--color-border) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
-          >
-            Wala na
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <span
           id={`accuracy-${report.id}`}
           className={`text-(--color-ink-muted) ${compact ? "text-[11px]" : "text-xs"}`}
         >
@@ -135,7 +114,7 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
             disabled={disabled}
             onClick={() => vote("ACCURATE")}
             aria-label="Tama ang report na ito"
-            className={`${buttonBase} inline-flex items-center gap-1 border-(--color-border) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
+            className={`${buttonBase} gap-1 border-(--color-border-strong) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
           >
             <Check className="h-3 w-3" aria-hidden="true" />
             Tama
@@ -145,7 +124,7 @@ export function ValidationControls({ report, compact = false, onVoted }: Validat
             disabled={disabled}
             onClick={() => vote("INACCURATE")}
             aria-label="Mali ang report na ito"
-            className={`${buttonBase} inline-flex items-center gap-1 border-(--color-border) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
+            className={`${buttonBase} gap-1 border-(--color-border-strong) text-(--color-ink) hover:bg-(--color-paper) disabled:opacity-50`}
           >
             <X className="h-3 w-3" aria-hidden="true" />
             Mali

@@ -6,7 +6,17 @@
  * provider are guaranteed to speak the same shape.
  */
 
-/** Filipino-friendly flood depth classification (spec section 8). */
+/**
+ * Filipino-friendly flood depth classification (spec section 8).
+ *
+ * `HUMUPA_NA` is the odd one out: it is a *condition*, not a depth. It
+ * means "the flooding that was here has subsided" — which is a different
+ * claim from `WALANG_BAHA` ("no flooding seen here"), because it carries
+ * the history that water was here recently and may return. It lives in
+ * this union so it can be stored in the same column, but it is
+ * deliberately absent from FLOOD_DEPTH_OPTIONS so it can never be picked
+ * as an answer to "gaano kalalim?".
+ */
 export type FloodDepthCode =
   | "WALANG_BAHA"
   | "GUTTER_DEEP"
@@ -15,7 +25,8 @@ export type FloodDepthCode =
   | "TUHOD"
   | "HITA"
   | "BAYWANG"
-  | "HINDI_MADAANAN";
+  | "HINDI_MADAANAN"
+  | "HUMUPA_NA";
 
 export interface FloodDepthOption {
   code: FloodDepthCode;
@@ -89,10 +100,37 @@ export const FLOOD_DEPTH_OPTIONS: FloodDepthOption[] = [
   },
 ];
 
+/**
+ * "The flood has subsided." Kept out of FLOOD_DEPTH_OPTIONS on purpose —
+ * that array is the answer set for "gaano kalalim?", and this is not a
+ * depth. Keeping it separate is what stops it appearing in the report
+ * form's depth picker and in the follow-up depth picker without either
+ * of them needing to filter it out by name.
+ *
+ * Severity 0 matches WALANG_BAHA for sorting (both mean "passable now"),
+ * but deriveStatus treats them differently: a road that just drained is
+ * not the same as a road that was never flooded.
+ */
+export const HUMUPA_NA_OPTION: FloodDepthOption = {
+  code: "HUMUPA_NA",
+  label: "Humupa Na",
+  description: "Humupa na ang baha dito — pero maaaring bumalik.",
+  severity: 0,
+  approxCm: [0, 0],
+};
+
+/** Every condition that can be *displayed*, including the non-depth ones. */
+const ALL_CONDITION_OPTIONS: FloodDepthOption[] = [...FLOOD_DEPTH_OPTIONS, HUMUPA_NA_OPTION];
+
 export function getFloodDepthOption(code: FloodDepthCode): FloodDepthOption {
-  const found = FLOOD_DEPTH_OPTIONS.find((o) => o.code === code);
+  const found = ALL_CONDITION_OPTIONS.find((o) => o.code === code);
   if (!found) throw new Error(`Unknown flood depth code: ${code}`);
   return found;
+}
+
+/** True when the code describes water currently on the road. */
+export function isActiveFlood(code: FloodDepthCode): boolean {
+  return code !== "WALANG_BAHA" && code !== "HUMUPA_NA";
 }
 
 export type RoadConditionCode =
@@ -101,12 +139,23 @@ export type RoadConditionCode =
   | "DIFFICULT"
   | "NOT_PASSABLE";
 
-export const ROAD_CONDITION_OPTIONS: { code: RoadConditionCode; label: string }[] = [
-  { code: "PASSABLE", label: "Passable" },
-  { code: "PASSABLE_WITH_CAUTION", label: "Passable with caution" },
-  { code: "DIFFICULT", label: "Difficult to pass" },
-  { code: "NOT_PASSABLE", label: "Not passable" },
-];
+/**
+ * All four values remain valid so reports already in the database keep
+ * rendering. The form, however, now offers a single yes/no tick — in
+ * practice reporters could not reliably tell "with caution" from
+ * "difficult", and a binary they answer honestly beats a scale they
+ * guess at. `ROAD_CONDITION_LABELS` covers display of legacy values.
+ */
+export const ROAD_CONDITION_LABELS: Record<RoadConditionCode, string> = {
+  PASSABLE: "Madaanan",
+  PASSABLE_WITH_CAUTION: "Madaanan nang may ingat",
+  DIFFICULT: "Mahirap daanan",
+  NOT_PASSABLE: "Hindi madaanan",
+};
+
+export const ROAD_CONDITION_OPTIONS: { code: RoadConditionCode; label: string }[] = (
+  ["PASSABLE", "PASSABLE_WITH_CAUTION", "DIFFICULT", "NOT_PASSABLE"] as RoadConditionCode[]
+).map((code) => ({ code, label: ROAD_CONDITION_LABELS[code] }));
 
 export type VehicleTypeCode =
   | "MOTORCYCLE"
@@ -116,14 +165,18 @@ export type VehicleTypeCode =
   | "JEEPNEY"
   | "OTHER";
 
-export const VEHICLE_TYPE_OPTIONS: { code: VehicleTypeCode; label: string }[] = [
-  { code: "MOTORCYCLE", label: "Motorcycle" },
-  { code: "SEDAN", label: "Sedan" },
-  { code: "SUV", label: "SUV" },
-  { code: "TRUCK", label: "Truck" },
-  { code: "JEEPNEY", label: "Jeepney" },
-  { code: "OTHER", label: "Other" },
-];
+export const VEHICLE_TYPE_LABELS: Record<VehicleTypeCode, string> = {
+  MOTORCYCLE: "Motorcycle",
+  SEDAN: "Sedan",
+  SUV: "SUV",
+  TRUCK: "Truck",
+  JEEPNEY: "Jeepney",
+  OTHER: "Other",
+};
+
+export const VEHICLE_TYPE_OPTIONS: { code: VehicleTypeCode; label: string }[] = (
+  ["MOTORCYCLE", "SEDAN", "SUV", "TRUCK", "JEEPNEY", "OTHER"] as VehicleTypeCode[]
+).map((code) => ({ code, label: VEHICLE_TYPE_LABELS[code] }));
 
 /** Lifecycle status of a report (spec section 15 / 22). */
 export type ReportStatus =
@@ -145,7 +198,12 @@ export interface FloodReport {
   province: string | null;
   floodDepth: FloodDepthCode;
   roadCondition: RoadConditionCode | null;
-  vehicleType: VehicleTypeCode | null;
+  /**
+   * Vehicle types the reporter saw affected. Multi-select: a flooded
+   * street rarely affects exactly one class of vehicle, and "passable for
+   * an SUV, not for a sedan" is the distinction motorists actually need.
+   */
+  vehicleTypes: VehicleTypeCode[];
   /** When the flooding was actually observed (UTC ISO string). */
   reportedAt: string;
   reporterName: string | null;
@@ -169,6 +227,8 @@ export interface FloodReport {
    * confirmed.
    */
   lastConfirmedAt: string | null;
+  /** Set when this report was filed in answer to an earlier one. */
+  followUpTo?: string | null;
   createdAt: string;
   updatedAt: string;
   /**
@@ -242,6 +302,7 @@ export interface FreshnessResult {
 export type MayBahaStatus =
   | "NO_RECENT_REPORT"
   | "NO_FLOOD_REPORTED"
+  | "SUBSIDED"
   | "FLOODED"
   | "SEVERE_FLOODING"
   | "ROAD_IMPASSABLE"
@@ -258,6 +319,76 @@ export interface LocationResult {
   province: string | null;
   /** Rough relevance category used for client-side ranking bias. */
   kind: "street" | "address" | "barangay" | "city" | "province" | "landmark" | "other";
+  /**
+   * Geographic extent, present for administrative places (barangay, city,
+   * province). Its presence is what makes an "area search" possible.
+   *
+   * Deliberately geographic rather than matching reports on a `city` text
+   * field: geocoders return name variants ("Quezon City" / "Lungsod
+   * Quezon"), and a name mismatch would silently drop flood reports —
+   * the most dangerous way this app could fail.
+   */
+  boundingBox?: AreaBounds | null;
+}
+
+/** South-west / north-east corners, as returned by the geocoder. */
+export interface AreaBounds {
+  minLat: number;
+  minLon: number;
+  maxLat: number;
+  maxLon: number;
+}
+
+/** Administrative kinds worth answering with an area summary rather than one card. */
+export const AREA_KINDS = ["barangay", "city", "province"] as const;
+
+/**
+ * Roughly 2 km, expressed in degrees. Anything whose bounding box spans
+ * more than this in either axis is treated as an area even if we failed
+ * to classify it, because the two ways of being wrong are not equally
+ * bad:
+ *
+ *   - Wrongly treating a point as an area shows the user MORE reports
+ *     than strictly asked for. Harmless.
+ *   - Wrongly treating an area as a point answers a city-wide question
+ *     with a 300 m circle, and reports "walang recent na report" for a
+ *     city that may be flooding a kilometre away. That is the failure
+ *     this product cannot have.
+ *
+ * So the tie-breaker deliberately favours the area search.
+ */
+const AREA_SPAN_DEGREES = 0.02;
+
+export function boundingBoxSpanDegrees(box: AreaBounds): { lat: number; lon: number } {
+  return {
+    lat: Math.abs(box.maxLat - box.minLat),
+    lon: Math.abs(box.maxLon - box.minLon),
+  };
+}
+
+export function isAreaSearch(location: {
+  kind: LocationResult["kind"];
+  boundingBox?: AreaBounds | null;
+}): boolean {
+  const box = location.boundingBox;
+  if (!box) return false;
+  if ((AREA_KINDS as readonly string[]).includes(location.kind)) return true;
+
+  // Safety net for anything the geocoder labelled in a way we did not
+  // recognise: judge it by the size of the box, which is a physical fact
+  // rather than a naming convention.
+  const span = boundingBoxSpanDegrees(box);
+  return span.lat > AREA_SPAN_DEGREES || span.lon > AREA_SPAN_DEGREES;
+}
+
+/** Aggregate answer for a whole area — never a single condition claim. */
+export interface AreaSearchResult {
+  bounds: AreaBounds;
+  label: string;
+  totalReports: number;
+  impassableCount: number;
+  severeCount: number;
+  reports: FloodReport[];
 }
 
 export interface NearbySearchResult {

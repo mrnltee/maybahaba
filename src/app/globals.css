@@ -12,19 +12,31 @@
   --color-paper: #fbfaf7;
   --color-ink: #14181b;
   --color-ink-muted: #4b5359;
-  --color-ink-faint: #767f85;
+  /* Darkened from #767f85: that failed WCAG 1.4.3 at 3.91:1 on paper. */
+  --color-ink-faint: #6c7479;
+  /* Decorative dividers only — exempt from 1.4.11 non-text contrast. */
   --color-border: #dcd7cd;
+  /* Boundaries of interactive controls (inputs, buttons, pills) must hit
+     3:1 per WCAG 1.4.11. The soft border above measures 1.4:1. */
+  --color-border-strong: #94918a;
   --color-surface: #ffffff;
 
   /* Brand: overcast-sky blue. Community-run public utility, not corporate. */
-  --color-brand: #0f5c73;
+  /* Brand navy. #1E3A8A, not the brighter #3B82F6 from the palette:
+     the bright blue is 3.68:1 on white, which fails WCAG AA for text
+     (4.5:1) and for white-on-brand buttons. Navy is 10.36:1. */
+  --color-brand: #1E3A8A;
   --color-brand-ink: #ffffff;
-  --color-brand-hover: #0c4a5d;
+  --color-brand-hover: #16306e;
+  /* Bright blue is an ACCENT only — logo water, decorative fills.
+     Never text, never a button background with text on it. */
+  --color-brand-accent: #3B82F6;
 
   /* Status colors — always paired with text/icon, never used alone. */
   --color-safe: #1a7a4c;
   --color-safe-bg: #eaf6ef;
-  --color-warn: #a5610a;
+  /* Nudged from #a5610a: 4.37:1 on warn-bg, just under the 4.5 floor. */
+  --color-warn: #a05e0a;
   --color-warn-bg: #fdf1e2;
   --color-danger: #b3261e;
   --color-danger-bg: #fbeae9;
@@ -41,6 +53,7 @@
   --color-ink-muted: var(--color-ink-muted);
   --color-ink-faint: var(--color-ink-faint);
   --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
   --color-surface: var(--color-surface);
   --color-brand: var(--color-brand);
   --color-brand-ink: var(--color-brand-ink);
@@ -111,4 +124,42 @@ body {
 }
 .animate-pulse-soft {
   animation: pulse-soft 1.6s ease-in-out infinite;
+}
+
+/*
+ * Vertical flood-depth slider.
+ *
+ * `writing-mode: vertical-lr` + `direction: rtl` is the modern way to get
+ * a real vertical range input: the element stays a genuine
+ * <input type="range">, so keyboard, screen readers and touch behave
+ * natively. The older trick — rotating a horizontal input — breaks hit
+ * areas and confuses assistive tech about which end is the minimum.
+ *
+ * rtl puts the minimum at the BOTTOM, so dragging up raises the water,
+ * which is the whole point of the interaction.
+ */
+.mbb-depth-slider {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  /* 24px keeps the thumb inside WCAG 2.5.8's target size even though the
+     track itself is narrow. */
+  min-width: 24px;
+}
+
+.mbb-depth-slider::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+}
+
+.mbb-depth-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mbb-scene-animated {
+    transition:
+      y 220ms ease-out,
+      height 220ms ease-out;
+  }
 }

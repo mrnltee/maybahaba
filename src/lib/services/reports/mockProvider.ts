@@ -2,7 +2,7 @@ import { AUTO_FLAG_INACCURATE_THRESHOLD } from "@/lib/config/confidence";
 import { REPORT_EXPIRY_MINUTES } from "@/lib/config/freshness";
 import { getEffectiveTimestamp } from "@/lib/freshness";
 import { distanceMeters } from "@/lib/geo";
-import type { CommunityAction, FloodReport, ValidationAction } from "@/lib/types";
+import type { AreaBounds, CommunityAction, FloodReport, ValidationAction } from "@/lib/types";
 import { randomUUID } from "crypto";
 import type {
   CreateReportInput,
@@ -39,7 +39,7 @@ function seedReports(): FloodReport[] {
       province: "Metro Manila",
       floodDepth: "GUTTER_DEEP",
       roadCondition: "PASSABLE_WITH_CAUTION",
-      vehicleType: "SEDAN",
+      vehicleTypes: ["SEDAN"],
       reportedAt: minutesAgoIso(12),
       reporterName: "Juan",
       anonymous: false,
@@ -65,7 +65,7 @@ function seedReports(): FloodReport[] {
       province: "Metro Manila",
       floodDepth: "BUKONG_BUKONG",
       roadCondition: "DIFFICULT",
-      vehicleType: "MOTORCYCLE",
+      vehicleTypes: ["MOTORCYCLE"],
       reportedAt: minutesAgoIso(25),
       reporterName: null,
       anonymous: true,
@@ -91,7 +91,7 @@ function seedReports(): FloodReport[] {
       province: "Metro Manila",
       floodDepth: "TUHOD",
       roadCondition: "DIFFICULT",
-      vehicleType: "SUV",
+      vehicleTypes: ["SUV"],
       reportedAt: minutesAgoIso(48),
       reporterName: "Marikit",
       anonymous: false,
@@ -117,7 +117,7 @@ function seedReports(): FloodReport[] {
       province: "Metro Manila",
       floodDepth: "HINDI_MADAANAN",
       roadCondition: "NOT_PASSABLE",
-      vehicleType: "MOTORCYCLE",
+      vehicleTypes: ["MOTORCYCLE"],
       reportedAt: minutesAgoIso(8),
       reporterName: null,
       anonymous: true,
@@ -143,7 +143,7 @@ function seedReports(): FloodReport[] {
       province: "Metro Manila",
       floodDepth: "WALANG_BAHA",
       roadCondition: "PASSABLE",
-      vehicleType: null,
+      vehicleTypes: [],
       reportedAt: minutesAgoIso(15),
       reporterName: "Mel",
       anonymous: false,
@@ -169,7 +169,7 @@ function seedReports(): FloodReport[] {
       province: "Metro Manila",
       floodDepth: "BAYWANG",
       roadCondition: "NOT_PASSABLE",
-      vehicleType: "TRUCK",
+      vehicleTypes: ["TRUCK"],
       reportedAt: minutesAgoIso(300), // stale, should not read as current
       reporterName: null,
       anonymous: true,
@@ -200,6 +200,21 @@ class MockReportProvider implements ReportService {
       .filter((r) => r.status !== "DENIED")
       .filter((r) => distanceMeters(latitude, longitude, r.latitude, r.longitude) <= radiusMeters)
       .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
+  }
+
+  async getInArea(bounds: AreaBounds, limit = 200): Promise<FloodReport[]> {
+    await this.sweepExpired();
+    return this.reports
+      .filter((r) => r.status !== "DENIED")
+      .filter(
+        (r) =>
+          r.latitude >= bounds.minLat &&
+          r.latitude <= bounds.maxLat &&
+          r.longitude >= bounds.minLon &&
+          r.longitude <= bounds.maxLon
+      )
+      .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime())
+      .slice(0, limit);
   }
 
   async getById(id: string): Promise<FloodReport | null> {
@@ -326,6 +341,14 @@ class MockReportProvider implements ReportService {
     }
 
     return list.slice(0, filter.limit ?? 50);
+  }
+
+  async getAllForAdmin(limit = 1000): Promise<FloodReport[]> {
+    await this.sweepExpired();
+    return this.reports
+      .slice()
+      .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime())
+      .slice(0, limit);
   }
 
   async sweepExpired(): Promise<number> {

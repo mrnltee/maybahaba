@@ -1,6 +1,6 @@
 import { REPORT_EXPIRY_MINUTES } from "@/lib/config/freshness";
 import { supabaseAdmin, supabasePublic } from "@/lib/supabaseClient";
-import type { CommunityAction, FloodReport, ValidationAction } from "@/lib/types";
+import type { AreaBounds, CommunityAction, FloodReport, ValidationAction, VehicleTypeCode } from "@/lib/types";
 import type { CreateReportInput, PendingReportsFilter, ReportService } from "./types";
 import { ReportServiceError } from "./types";
 
@@ -24,7 +24,9 @@ interface ReportRow {
   province: string | null;
   flood_depth: FloodReport["floodDepth"];
   road_condition: FloodReport["roadCondition"];
-  vehicle_type: FloodReport["vehicleType"];
+  vehicle_type: VehicleTypeCode | null;
+  vehicle_types: VehicleTypeCode[] | null;
+  follow_up_to: string | null;
   reported_at: string;
   reporter_name: string | null;
   anonymous: boolean;
@@ -53,7 +55,10 @@ function rowToReport(row: ReportRow): FloodReport {
     province: row.province,
     floodDepth: row.flood_depth,
     roadCondition: row.road_condition,
-    vehicleType: row.vehicle_type,
+    // Prefer the array column; fall back to the legacy single value so
+    // pre-migration rows still render (see migration 0005).
+    vehicleTypes: row.vehicle_types ?? (row.vehicle_type ? [row.vehicle_type] : []),
+    followUpTo: row.follow_up_to ?? null,
     reportedAt: row.reported_at,
     reporterName: row.reporter_name,
     anonymous: row.anonymous,
@@ -84,6 +89,19 @@ export class SupabaseReportProvider implements ReportService {
     return (data as ReportRow[]).map(rowToReport);
   }
 
+  async getInArea(bounds: AreaBounds, limit = 200): Promise<FloodReport[]> {
+    if (!supabasePublic) throw new ReportServiceError("Supabase is not configured");
+    const { data, error } = await supabasePublic.rpc("reports_in_area", {
+      min_lat: bounds.minLat,
+      min_lon: bounds.minLon,
+      max_lat: bounds.maxLat,
+      max_lon: bounds.maxLon,
+      max_rows: limit,
+    });
+    if (error) throw new ReportServiceError("Failed to fetch reports in area", error);
+    return (data as ReportRow[]).map(rowToReport);
+  }
+
   async getById(id: string): Promise<FloodReport | null> {
     if (!supabasePublic) throw new ReportServiceError("Supabase is not configured");
     const { data, error } = await supabasePublic.from("reports").select("*").eq("id", id).maybeSingle();
@@ -105,7 +123,8 @@ export class SupabaseReportProvider implements ReportService {
         province: input.province,
         flood_depth: input.floodDepth,
         road_condition: input.roadCondition,
-        vehicle_type: input.vehicleType,
+        vehicle_types: input.vehicleTypes,
+        follow_up_to: input.followUpTo ?? null,
         reported_at: input.reportedAt,
         reporter_name: input.reporterName,
         anonymous: input.anonymous,
@@ -176,6 +195,20 @@ export class SupabaseReportProvider implements ReportService {
 
     const { data, error } = await query;
     if (error) throw new ReportServiceError("Failed to fetch pending reports", error);
+    return (data as ReportRow[]).map(rowToReport);
+  }
+
+  async getAllForAdmin(limit = 1000): Promise<FloodReport[]> {
+    // Uses the service-role client so RLS doesn't hide DENIED rows —
+    // this path is already gated behind a moderator session upstream.
+    const client = supabaseAdmin ?? supabasePublic;
+    if (!client) throw new ReportServiceError("Supabase is not configured");
+    const { data, error } = await client
+      .from("reports")
+      .select("*")
+      .order("reported_at", { ascending: false })
+      .limit(limit);
+    if (error) throw new ReportServiceError("Failed to fetch reports", error);
     return (data as ReportRow[]).map(rowToReport);
   }
 

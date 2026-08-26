@@ -35,7 +35,8 @@ export const createReportSchema = z.object({
   province: z.string().trim().max(120).nullable().optional(),
   floodDepth: floodDepthEnum,
   roadCondition: roadConditionEnum.nullable().optional(),
-  vehicleType: vehicleTypeEnum.nullable().optional(),
+  // Multi-select; capped so a request cannot carry an unbounded array.
+  vehicleTypes: z.array(vehicleTypeEnum).max(6).optional(),
   reportedAt: z.string().datetime({ offset: true }),
   reporterName: z.string().trim().max(60).nullable().optional(),
   anonymous: z.boolean(),
@@ -68,5 +69,45 @@ export const searchQuerySchema = z.object({
 export const nearbyQuerySchema = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
-  radius: z.coerce.number().min(1).max(5000).optional(),
+  // Bounds mirror MIN/MAX_SEARCH_RADIUS_METERS in config/freshness.
+  radius: z.coerce.number().min(300).max(10000).optional(),
+});
+
+/**
+ * Area search bounds. Bounded in size as well as validity: an envelope
+ * spanning the whole country would return an unbounded result set and
+ * answer nobody's question.
+ */
+export const areaQuerySchema = z
+  .object({
+    minLat: z.coerce.number().min(-90).max(90),
+    minLon: z.coerce.number().min(-180).max(180),
+    maxLat: z.coerce.number().min(-90).max(90),
+    maxLon: z.coerce.number().min(-180).max(180),
+    label: z.string().trim().max(200).optional().default(""),
+  })
+  .refine((b) => b.maxLat > b.minLat && b.maxLon > b.minLon, {
+    message: "Bounds must be non-empty and correctly ordered",
+  })
+  .refine((b) => b.maxLat - b.minLat <= 5 && b.maxLon - b.minLon <= 5, {
+    message: "Area too large",
+  });
+
+/**
+ * "Tulungan ang susunod" follow-up. Only the new condition is accepted —
+ * the location is copied from the report being answered, server-side, so
+ * a follow-up can never place a report somewhere the client chooses.
+ */
+export const followUpSchema = z.object({
+  floodDepth: z.enum([
+    "WALANG_BAHA",
+    "GUTTER_DEEP",
+    "BUKONG_BUKONG",
+    "BINTI",
+    "TUHOD",
+    "HITA",
+    "BAYWANG",
+    "HINDI_MADAANAN",
+    "HUMUPA_NA",
+  ]),
 });

@@ -90,7 +90,7 @@ export async function POST(request: Request) {
       province: input.province ?? null,
       floodDepth: input.floodDepth,
       roadCondition: input.roadCondition ?? null,
-      vehicleType: input.vehicleType ?? null,
+      vehicleTypes: input.vehicleTypes ?? [],
       reportedAt: input.reportedAt,
       reporterName: input.anonymous ? null : (input.reporterName ?? null),
       anonymous: input.anonymous,
